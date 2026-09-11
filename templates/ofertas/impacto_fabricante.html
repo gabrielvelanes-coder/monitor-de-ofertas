@@ -22,28 +22,14 @@
   <div class="card"><div class="rotulo">Margem na oferta</div><div class="valor">{{ kpis.margem_oferta_pct|numero:1 }}%</div></div>
 </div>
 
-<h3>Venda por mês — base vs. oferta</h3>
-<table>
-  <thead>
-    <tr><th>Mês</th><th>Itens base</th><th>Venda base</th><th>Itens oferta</th><th>Venda oferta</th></tr>
-  </thead>
-  <tbody>
-    {% for m in por_mes %}
-      <tr>
-        <td>{{ m.ano_mes }}</td>
-        <td>{{ m.itens_base|numero }}</td>
-        <td>{{ m.venda_base|brl }}</td>
-        <td>{{ m.itens_oferta|numero }}</td>
-        <td>{{ m.venda_oferta|brl }}</td>
-      </tr>
-    {% empty %}
-      <tr><td colspan="5" class="vazio">Sem dados.</td></tr>
-    {% endfor %}
-  </tbody>
-</table>
+<div class="grafico-card">
+  <h3 style="margin-top:0;">Venda por mês — base vs. oferta</h3>
+  <canvas id="grafico-fabricante"></canvas>
+</div>
+{{ grafico|json_script:"dados-grafico-fabricante" }}
 
-<h3 style="margin-top:24px;">Lojas com maior venda na promoção</h3>
-<table>
+<h3>Lojas com maior venda na promoção</h3>
+<table id="tabela-lojas" class="tabela-interativa">
   <thead>
     <tr><th>Loja</th><th>Bandeira</th><th>Itens</th><th>Venda</th><th>Lucro</th></tr>
   </thead>
@@ -62,4 +48,10 @@
   </tbody>
 </table>
 
+{% endblock %}
+{% block extra_js %}
+<script>
+  var dados = JSON.parse(document.getElementById('dados-grafico-fabricante').textContent);
+  graficoLinha('grafico-fabricante', dados.labels, dados.series);
+</script>
 {% endblock %}

@@ -19,26 +19,14 @@
   <div class="card"><div class="rotulo">Impacto</div><div class="valor">{% if kpis.impacto_geral %}{{ kpis.impacto_geral|numero:2 }}×{% else %}—{% endif %}</div></div>
 </div>
 
-<h3>Vendas diárias de agosto <small style="color:var(--muted); font-weight:400;">— janela do evento destacada</small></h3>
-<table>
-  <thead>
-    <tr><th>Dia</th><th>Itens</th><th>Venda</th></tr>
-  </thead>
-  <tbody>
-    {% for d in serie_diaria %}
-      <tr {% if d.na_janela %}style="background:var(--accent-bg);"{% endif %}>
-        <td>{{ d.data|date:"d/m" }}{% if d.na_janela %} <strong>· evento</strong>{% endif %}</td>
-        <td>{{ d.itens|numero }}</td>
-        <td>{{ d.venda|brl }}</td>
-      </tr>
-    {% empty %}
-      <tr><td colspan="3" class="vazio">Sem dados.</td></tr>
-    {% endfor %}
-  </tbody>
-</table>
+<div class="grafico-card">
+  <h3 style="margin-top:0;">Vendas diárias de agosto <small style="color:var(--muted); font-weight:400;">— barra laranja = janela do evento</small></h3>
+  <canvas id="grafico-supracorp"></canvas>
+</div>
+{{ grafico|json_script:"dados-grafico-supracorp" }}
 
 <h3 style="margin-top:24px;">Impacto por loja</h3>
-<table>
+<table id="tabela-lojas" class="tabela-interativa">
   <thead>
     <tr><th>Loja</th><th>Bandeira</th><th>Itens no evento</th><th>Média diária (resto)</th><th>Impacto</th></tr>
   </thead>
@@ -58,7 +46,7 @@
 </table>
 
 <h3 style="margin-top:24px;">Itens por produto no evento</h3>
-<table>
+<table id="tabela-produtos" class="tabela-interativa">
   <thead>
     <tr><th>Produto</th><th>Itens</th><th>Venda</th></tr>
   </thead>
@@ -75,4 +63,10 @@
   </tbody>
 </table>
 
+{% endblock %}
+{% block extra_js %}
+<script>
+  var dados = JSON.parse(document.getElementById('dados-grafico-supracorp').textContent);
+  graficoBarra('grafico-supracorp', dados.labels, dados.series, dados.destaque);
+</script>
 {% endblock %}

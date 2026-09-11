@@ -1,4 +1,5 @@
 <!doctype html>
+{% load static %}
 <html lang="pt-br">
 <head>
   <meta charset="utf-8">
@@ -8,32 +9,47 @@
     :root {
       --bg: #f6f7f9; --card: #ffffff; --border: #e3e6ea; --text: #1f2430;
       --muted: #6b7280; --accent: #2f6feb; --accent-bg: #eaf1ff;
+      --sidebar-w: 230px;
     }
     * { box-sizing: border-box; }
     body {
       margin: 0; background: var(--bg); color: var(--text);
       font: 15px/1.5 -apple-system, "Segoe UI", Roboto, sans-serif;
     }
-    header {
-      background: var(--card); border-bottom: 1px solid var(--border);
-      padding: 14px 24px; display: flex; align-items: center; gap: 18px;
-      flex-wrap: wrap;
+    .layout { display: flex; min-height: 100vh; }
+
+    aside {
+      width: var(--sidebar-w); flex: 0 0 var(--sidebar-w);
+      background: var(--card); border-right: 1px solid var(--border);
+      padding: 18px 14px; position: sticky; top: 0; height: 100vh;
+      overflow-y: auto; display: flex; flex-direction: column; gap: 18px;
     }
-    header h1 { font-size: 17px; margin: 0; white-space: nowrap; }
-    header h1 span { color: var(--muted); font-weight: 400; }
-    nav { display: flex; gap: 4px; flex-wrap: wrap; }
+    aside h1 { font-size: 15.5px; margin: 0 0 2px; padding: 0 6px; }
+    aside h1 span { display: block; color: var(--muted); font-weight: 400; font-size: 12.5px; }
+    nav { display: flex; flex-direction: column; gap: 2px; }
+    nav .grupo-titulo {
+      font-size: 11px; text-transform: uppercase; letter-spacing: .04em;
+      color: var(--muted); margin: 12px 6px 2px; font-weight: 600;
+    }
+    nav .grupo-titulo:first-child { margin-top: 0; }
     nav a {
-      color: var(--text); text-decoration: none; padding: 6px 10px;
-      border-radius: 6px; font-size: 13.5px;
+      color: var(--text); text-decoration: none; padding: 7px 10px;
+      border-radius: 7px; font-size: 13.8px;
     }
     nav a:hover { background: var(--accent-bg); }
     nav a.ativo { background: var(--accent); color: #fff; }
-    .filtro-bandeira { margin-left: auto; display: flex; gap: 6px; align-items: center; }
+
+    .conteudo { flex: 1; min-width: 0; }
+    .barra-topo {
+      background: var(--card); border-bottom: 1px solid var(--border);
+      padding: 12px 24px; display: flex; justify-content: flex-end;
+    }
+    .filtro-bandeira { display: flex; gap: 6px; align-items: center; }
     .filtro-bandeira select {
       padding: 5px 8px; border-radius: 6px; border: 1px solid var(--border);
       font-size: 13.5px;
     }
-    main { padding: 24px; max-width: 1200px; margin: 0 auto; }
+    main { padding: 24px; max-width: 1200px; }
     .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 24px; }
     .card {
       background: var(--card); border: 1px solid var(--border); border-radius: 10px;
@@ -41,43 +57,85 @@
     }
     .card .rotulo { color: var(--muted); font-size: 12.5px; text-transform: uppercase; letter-spacing: .03em; }
     .card .valor { font-size: 24px; font-weight: 600; margin-top: 4px; }
+
+    .grafico-card {
+      background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+      padding: 16px; margin-bottom: 22px;
+    }
+    .grafico-card canvas { max-height: 280px; }
+
     table { width: 100%; border-collapse: collapse; background: var(--card); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
     th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--border); font-size: 13.5px; }
-    th { background: #fafbfc; color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; }
+    th { background: #fafbfc; color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; user-select: none; }
+    table.tabela-interativa th::after { content: ''; display: inline-block; width: 10px; }
+    table.tabela-interativa th.ordenado-asc::after { content: '▲'; font-size: 9px; margin-left: 4px; }
+    table.tabela-interativa th.ordenado-desc::after { content: '▼'; font-size: 9px; margin-left: 4px; }
     tr:last-child td { border-bottom: none; }
     .aviso {
       background: #fff8e6; border: 1px solid #f0d792; color: #7a5a00;
       padding: 10px 14px; border-radius: 8px; font-size: 13.5px; margin-bottom: 18px;
     }
     .vazio { color: var(--muted); font-style: italic; }
+    .campo-busca {
+      padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border); width: 280px;
+    }
+
+    .abas {
+      display: flex; flex-direction: row; flex-wrap: wrap; gap: 6px; margin-bottom: 6px;
+    }
+    .abas a {
+      padding: 6px 12px; border-radius: 20px; font-size: 13px; text-decoration: none;
+      background: var(--accent-bg); color: var(--text);
+    }
+    .abas a.ativa { background: var(--accent); color: #fff; }
   </style>
 </head>
 <body>
-  <header>
-    <h1>Painel de Ofertas <span>· Grupo Velanes</span></h1>
-    <nav>
-      <a href="{% url 'ofertas:home' %}" class="{% if secao == 'home' %}ativo{% endif %}">Início</a>
-      <a href="{% url 'ofertas:leve3' %}" class="{% if secao == 'leve3' %}ativo{% endif %}">Leve 3 Pague 2</a>
-      <a href="{% url 'ofertas:cestoes' %}" class="{% if secao == 'cestoes' %}ativo{% endif %}">Cestões</a>
-      <a href="{% url 'ofertas:supracorp' %}" class="{% if secao == 'supracorp' %}ativo{% endif %}">Supra Corp Day</a>
-      <a href="{% url 'ofertas:impacto_fabricante' 'kenvue' %}" class="{% if secao == 'fabricante_kenvue' %}ativo{% endif %}">Kenvue</a>
-      <a href="{% url 'ofertas:impacto_fabricante' 'principia' %}" class="{% if secao == 'fabricante_principia' %}ativo{% endif %}">Principia</a>
-      <a href="{% url 'ofertas:impacto_fabricante' 'botica' %}" class="{% if secao == 'fabricante_botica' %}ativo{% endif %}">Botica</a>
-      <a href="{% url 'ofertas:impacto_fabricante' 'procter' %}" class="{% if secao == 'fabricante_procter' %}ativo{% endif %}">Procter</a>
-      <a href="{% url 'ofertas:marketing' %}" class="{% if secao == 'marketing' %}ativo{% endif %}">Marketing</a>
-      <a href="{% url 'ofertas:kimberly' %}" class="{% if secao == 'kimberly' %}ativo{% endif %}">Kimberly</a>
-    </nav>
-    <form class="filtro-bandeira" method="get">
-      <label for="bandeira">Bandeira</label>
-      <select name="bandeira" id="bandeira" onchange="this.form.submit()">
-        <option value="" {% if not bandeira_atual %}selected{% endif %}>Todas</option>
-        <option value="velanes" {% if bandeira_atual == 'velanes' %}selected{% endif %}>Velanes</option>
-        <option value="ultra_popular" {% if bandeira_atual == 'ultra_popular' %}selected{% endif %}>Ultra Popular</option>
-      </select>
-    </form>
-  </header>
-  <main>
-    {% block conteudo %}{% endblock %}
-  </main>
+  <div class="layout">
+    <aside>
+      <h1>Painel de Ofertas <span>Grupo Velanes</span></h1>
+      <nav>
+        <a href="{% url 'ofertas:home' %}" class="{% if secao == 'home' %}ativo{% endif %}">Início</a>
+
+        <div class="grupo-titulo">Mecânicas</div>
+        <a href="{% url 'ofertas:leve3' %}" class="{% if secao == 'leve3' %}ativo{% endif %}">Leve 3 Pague 2</a>
+        <a href="{% url 'ofertas:cestoes' %}" class="{% if secao == 'cestoes' %}ativo{% endif %}">Cestões</a>
+        <a href="{% url 'ofertas:supracorp' %}" class="{% if secao == 'supracorp' %}ativo{% endif %}">Supra Corp Day</a>
+        <a href="{% url 'ofertas:marketing' %}" class="{% if secao == 'marketing' %}ativo{% endif %}">Itens do Marketing</a>
+        <a href="{% url 'ofertas:kimberly' %}" class="{% if secao == 'kimberly' %}ativo{% endif %}">Kimberly</a>
+
+        <div class="grupo-titulo">Impacto por fabricante</div>
+        <a href="{% url 'ofertas:impacto_fabricante' 'kenvue' %}" class="{% if secao == 'fabricante_kenvue' %}ativo{% endif %}">Kenvue</a>
+        <a href="{% url 'ofertas:impacto_fabricante' 'principia' %}" class="{% if secao == 'fabricante_principia' %}ativo{% endif %}">Principia</a>
+        <a href="{% url 'ofertas:impacto_fabricante' 'botica' %}" class="{% if secao == 'fabricante_botica' %}ativo{% endif %}">Botica</a>
+        <a href="{% url 'ofertas:impacto_fabricante' 'procter' %}" class="{% if secao == 'fabricante_procter' %}ativo{% endif %}">Procter</a>
+
+        <div class="grupo-titulo">Sistema</div>
+        <a href="/admin/">Admin</a>
+      </nav>
+    </aside>
+
+    <div class="conteudo">
+      <div class="barra-topo">
+        <form class="filtro-bandeira" method="get">
+          {% for chave, valor in querystring_extra.items %}<input type="hidden" name="{{ chave }}" value="{{ valor }}">{% endfor %}
+          <label for="bandeira">Bandeira</label>
+          <select name="bandeira" id="bandeira" onchange="this.form.submit()">
+            <option value="" {% if not bandeira_atual %}selected{% endif %}>Todas</option>
+            <option value="velanes" {% if bandeira_atual == 'velanes' %}selected{% endif %}>Velanes</option>
+            <option value="ultra_popular" {% if bandeira_atual == 'ultra_popular' %}selected{% endif %}>Ultra Popular</option>
+          </select>
+        </form>
+      </div>
+      <main>
+        {% block conteudo %}{% endblock %}
+      </main>
+    </div>
+  </div>
+
+  <script src="{% static 'vendor/chart.umd.min.js' %}"></script>
+  <script src="{% static 'js/graficos.js' %}"></script>
+  <script src="{% static 'js/tabela.js' %}"></script>
+  {% block extra_js %}{% endblock %}
 </body>
 </html>

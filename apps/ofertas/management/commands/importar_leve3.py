@@ -6,7 +6,7 @@ from django.db import transaction
 from apps.lojas.models import Loja
 from apps.ofertas.erp import (
     ano_mes_de, codigo_barras, codigo_loja, coluna, encontrar_arquivo,
-    ler_relatorio_erp, remover_linha_total,
+    fabricante_generico, ler_relatorio_erp, remover_linha_total,
 )
 from apps.ofertas.models import Lancamento
 
@@ -68,11 +68,13 @@ class Command(BaseCommand):
                 lojas_sem_cadastro.add(codigo)
                 continue
 
+            produto = str(linha.get(col_produto, '') or '').strip()
             lancamentos.append(Lancamento(
                 mecanica=Lancamento.LEVE3,
                 loja=loja,
-                produto_descricao=str(linha.get(col_produto, '') or '').strip(),
+                produto_descricao=produto,
                 produto_codigo_barras=codigo_barras(linha.get(col_barras)),
+                fabricante=fabricante_generico(produto),
                 ano_mes=ano_mes,
                 itens=linha[col_itens],
                 venda=linha[col_venda],

@@ -12,6 +12,22 @@
   </div>
 {% endif %}
 
+<div class="abas" style="margin-bottom:18px;">
+  <a href="?{% if bandeira_atual %}bandeira={{ bandeira_atual }}&{% endif %}{% if busca %}busca={{ busca }}&{% endif %}"
+     class="{% if not fabricante_atual %}ativa{% endif %}">
+    Geral
+  </a>
+  {% for fab in fabricantes_disponiveis %}
+    <a href="?fabricante={{ fab }}{% if bandeira_atual %}&bandeira={{ bandeira_atual }}{% endif %}{% if busca %}&busca={{ busca }}{% endif %}"
+       class="{% if fabricante_atual == fab %}ativa{% endif %}">
+      {{ fab }}
+    </a>
+  {% endfor %}
+</div>
+<p style="color:var(--muted); font-size:12.5px; margin-top:-14px;">
+  Fabricante identificado pela sigla no fim do nome do produto (heurística, não é dado do ERP) — "Não identificado" quando não reconhece a sigla.
+</p>
+
 <div class="cards">
   <div class="card"><div class="rotulo">Itens vendidos</div><div class="valor">{{ kpis.itens|numero }}</div></div>
   <div class="card"><div class="rotulo">Ciclos</div><div class="valor">{{ kpis.ciclos|numero }}</div></div>
@@ -20,27 +36,14 @@
   <div class="card"><div class="rotulo">Margem ajustada</div><div class="valor">{{ kpis.margem_ajustada|brl }}</div></div>
 </div>
 
-<h3>Investimento e margem por mês</h3>
-<table>
-  <thead>
-    <tr><th>Mês</th><th>Investimento</th><th>Margem contábil</th><th>Margem ajustada</th></tr>
-  </thead>
-  <tbody>
-    {% for m in por_mes %}
-      <tr>
-        <td>{{ m.ano_mes }}</td>
-        <td>{{ m.investimento|brl }}</td>
-        <td>{{ m.margem_contabil|brl }}</td>
-        <td>{{ m.margem_ajustada|brl }}</td>
-      </tr>
-    {% empty %}
-      <tr><td colspan="4" class="vazio">Sem dados.</td></tr>
-    {% endfor %}
-  </tbody>
-</table>
+<div class="grafico-card">
+  <h3 style="margin-top:0;">Evolução mensal</h3>
+  <canvas id="grafico-leve3"></canvas>
+</div>
+{{ grafico|json_script:"dados-grafico-leve3" }}
 
-<h3 style="margin-top:24px;">Ranking de lojas (por investimento)</h3>
-<table>
+<h3>Ranking de lojas (por investimento)</h3>
+<table id="tabela-lojas" class="tabela-interativa">
   <thead>
     <tr><th>Loja</th><th>Bandeira</th><th>Investimento</th><th>Margem contábil</th><th>Margem ajustada</th></tr>
   </thead>
@@ -62,11 +65,11 @@
 <h3 style="margin-top:24px;">Produtos participantes</h3>
 <form method="get" style="margin-bottom:10px;">
   {% if bandeira_atual %}<input type="hidden" name="bandeira" value="{{ bandeira_atual }}">{% endif %}
-  <input type="text" name="busca" value="{{ busca }}" placeholder="Buscar produto…"
-         style="padding:6px 10px; border-radius:6px; border:1px solid var(--border); width:280px;">
-  <button type="submit" style="padding:6px 12px; border-radius:6px; border:1px solid var(--border); background:#fff; cursor:pointer;">Buscar</button>
+  {% if fabricante_atual %}<input type="hidden" name="fabricante" value="{{ fabricante_atual }}">{% endif %}
+  <input type="text" id="busca-produto" data-filtro-tabela="tabela-produtos" value="{{ busca }}"
+         placeholder="Buscar produto… (filtra na hora)" class="campo-busca">
 </form>
-<table>
+<table id="tabela-produtos" class="tabela-interativa">
   <thead>
     <tr><th>Produto</th><th>Itens</th><th>Ciclos</th><th>Investimento</th><th>Venda</th><th>Lucro</th></tr>
   </thead>
@@ -86,4 +89,10 @@
   </tbody>
 </table>
 
+{% endblock %}
+{% block extra_js %}
+<script>
+  var dados = JSON.parse(document.getElementById('dados-grafico-leve3').textContent);
+  graficoLinha('grafico-leve3', dados.labels, dados.series);
+</script>
 {% endblock %}

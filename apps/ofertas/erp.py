@@ -116,6 +116,28 @@ def codigo_loja(valor) -> str:
         return texto
 
 
+_LABORATORIOS_GENERICOS = {
+    'EMS': 'EMS', 'GMD': 'Germed', 'GERM': 'Germed', 'EUR': 'Eurofarma',
+    'PRAT': 'Prati', 'QUIM': 'Neo Química', 'MEDLEY': 'Medley',
+    'TEUT': 'Teuto', 'NATULAB': 'Natulab',
+}
+
+
+def fabricante_generico(produto_descricao: str) -> str:
+    """Heurística (não é regra validada no docx): o catálogo do ERP termina
+    o nome do produto genérico com a sigla do laboratório (ex. "...CPR C/30
+    EMS"). Usada só pra permitir filtrar o Leve 3 Pague 2 por fabricante —
+    quando não reconhece a sigla, devolve 'Não identificado'."""
+    if not produto_descricao:
+        return 'Não identificado'
+    ultimo_token = re.sub(r'[^A-Za-zÀ-ÿ]', '', produto_descricao.strip().split()[-1]).upper()
+    if ultimo_token in _LABORATORIOS_GENERICOS:
+        return _LABORATORIOS_GENERICOS[ultimo_token]
+    if 'PRA' in ultimo_token:
+        return 'Prati'
+    return 'Não identificado'
+
+
 def tag_sem_prefixo(texto) -> str:
     """'Cad. Oferta: PROMOÇÃO KENVUE' -> 'PROMOÇÃO KENVUE' — tira o prefixo
     "Cad. Oferta:"/"Manual:" pra comparar só o nome da tag."""

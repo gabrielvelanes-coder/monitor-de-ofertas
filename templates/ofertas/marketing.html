@@ -24,27 +24,14 @@
   <div class="card"><div class="rotulo">Lucro</div><div class="valor">{{ kpis.lucro|brl }}</div></div>
 </div>
 
-<h3>Venda por mês</h3>
-<table>
-  <thead>
-    <tr><th>Mês</th><th>Itens</th><th>Venda</th><th>Lucro</th></tr>
-  </thead>
-  <tbody>
-    {% for m in por_mes %}
-      <tr>
-        <td>{{ m.ano_mes }}</td>
-        <td>{{ m.itens|numero }}</td>
-        <td>{{ m.venda|brl }}</td>
-        <td>{{ m.lucro|brl }}</td>
-      </tr>
-    {% empty %}
-      <tr><td colspan="4" class="vazio">Sem dados.</td></tr>
-    {% endfor %}
-  </tbody>
-</table>
+<div class="grafico-card">
+  <h3 style="margin-top:0;">Venda por mês</h3>
+  <canvas id="grafico-marketing"></canvas>
+</div>
+{{ grafico|json_script:"dados-grafico-marketing" }}
 
-<h3 style="margin-top:24px;">Venda por fabricante</h3>
-<table>
+<h3>Venda por fabricante</h3>
+<table id="tabela-fabricantes" class="tabela-interativa">
   <thead>
     <tr><th>Fabricante</th><th>Itens</th><th>Venda</th><th>Lucro</th></tr>
   </thead>
@@ -63,13 +50,9 @@
 </table>
 
 <h3 style="margin-top:24px;">Produtos</h3>
-<form method="get" style="margin-bottom:10px;">
-  {% if bandeira_atual %}<input type="hidden" name="bandeira" value="{{ bandeira_atual }}">{% endif %}
-  <input type="text" name="busca" value="{{ busca }}" placeholder="Buscar produto…"
-         style="padding:6px 10px; border-radius:6px; border:1px solid var(--border); width:280px;">
-  <button type="submit" style="padding:6px 12px; border-radius:6px; border:1px solid var(--border); background:#fff; cursor:pointer;">Buscar</button>
-</form>
-<table>
+<input type="text" id="busca-produto" data-filtro-tabela="tabela-produtos" value="{{ busca }}"
+       placeholder="Buscar produto… (filtra na hora)" class="campo-busca" style="margin-bottom:10px;">
+<table id="tabela-produtos" class="tabela-interativa">
   <thead>
     <tr><th>Produto</th><th>Itens</th><th>Venda</th><th>Lucro</th></tr>
   </thead>
@@ -87,4 +70,10 @@
   </tbody>
 </table>
 
+{% endblock %}
+{% block extra_js %}
+<script>
+  var dados = JSON.parse(document.getElementById('dados-grafico-marketing').textContent);
+  graficoLinha('grafico-marketing', dados.labels, dados.series);
+</script>
 {% endblock %}

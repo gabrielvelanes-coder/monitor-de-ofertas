@@ -38,6 +38,24 @@ def filtrar_por_bandeira(queryset, bandeira: str):
     return queryset
 
 
+def querystring_extra(request, excluir=('bandeira',)) -> dict:
+    """Parâmetros de GET a preservar no form de bandeira (busca, fabricante
+    selecionado etc.) — pra trocar a bandeira sem perder o resto do filtro."""
+    return {chave: valor for chave, valor in request.GET.items() if chave not in excluir and valor}
+
+
+def grafico_mensal(por_mes, campos) -> dict:
+    """Converte uma série `por_mes` (lista de dicts com 'ano_mes' + Decimals)
+    em {labels, series} pronto pro `graficoLinha`/`graficoBarra` do JS —
+    Decimal não serializa em JSON, então converte pra float aqui."""
+    labels = [item['ano_mes'] for item in por_mes]
+    series = [
+        {'label': rotulo, 'data': [float(item.get(chave) or 0) for item in por_mes]}
+        for chave, rotulo in campos
+    ]
+    return {'labels': labels, 'series': series}
+
+
 def calcular_leve3(queryset, busca: str = ''):
     """Leve 3 Pague 2 (docx, seção 5.1 e 6):
     ciclos = INT(itens / 3); investimento = ciclos × (custo da linha / itens
