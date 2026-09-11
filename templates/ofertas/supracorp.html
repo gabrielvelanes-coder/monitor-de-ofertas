@@ -46,7 +46,7 @@
     {% for l in ranking_lojas %}
       <tr>
         <td>{{ l.codigo }}</td>
-        <td>{{ l.bandeira }}</td>
+        <td>{{ l.bandeira|bandeira_rotulo }}</td>
         <td>{{ l.itens_evento|numero }}</td>
         <td>{{ l.media_diaria|numero:2 }}</td>
         <td>{% if l.impacto %}{{ l.impacto|numero:2 }}×{% else %}—{% endif %}</td>

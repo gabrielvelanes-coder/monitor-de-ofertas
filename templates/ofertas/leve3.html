@@ -48,7 +48,7 @@
     {% for l in ranking_lojas %}
       <tr>
         <td>{{ l.codigo }}</td>
-        <td>{{ l.bandeira }}</td>
+        <td>{{ l.bandeira|bandeira_rotulo }}</td>
         <td>{{ l.investimento|brl }}</td>
         <td>{{ l.margem_contabil|brl }}</td>
         <td>{{ l.margem_ajustada|brl }}</td>

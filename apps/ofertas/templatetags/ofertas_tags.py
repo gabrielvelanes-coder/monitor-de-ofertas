@@ -4,6 +4,15 @@ from django import template
 
 register = template.Library()
 
+_ROTULOS_BANDEIRA = {'velanes': 'Velanes', 'ultra_popular': 'Ultra Popular'}
+
+
+@register.filter
+def bandeira_rotulo(valor) -> str:
+    """'ultra_popular' -> 'Ultra Popular' — pro valor cru do banco não
+    aparecer direto nas tabelas."""
+    return _ROTULOS_BANDEIRA.get(valor, valor)
+
 
 def _formatar(valor, casas=2) -> str:
     try:

@@ -51,7 +51,7 @@
     {% for l in ranking_lojas %}
       <tr>
         <td>{{ l.codigo }}</td>
-        <td>{{ l.bandeira }}</td>
+        <td>{{ l.bandeira|bandeira_rotulo }}</td>
         <td>{{ l.itens_oferta|numero }}</td>
         <td>{{ l.venda_oferta|brl }}</td>
         <td>{{ l.lucro_oferta|brl }}</td>
