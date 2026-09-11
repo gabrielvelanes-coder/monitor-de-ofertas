@@ -88,6 +88,9 @@
       background: var(--accent-bg); color: var(--text);
     }
     .abas a.ativa { background: var(--accent); color: #fff; }
+
+    tr.linha-clicavel { cursor: pointer; }
+    tr.linha-clicavel:hover { background: var(--accent-bg); }
   </style>
 </head>
 <body>
@@ -97,18 +100,16 @@
       <nav>
         <a href="{% url 'ofertas:home' %}" class="{% if secao == 'home' %}ativo{% endif %}">Início</a>
 
-        <div class="grupo-titulo">Mecânicas</div>
+        <div class="grupo-titulo">Ações</div>
         <a href="{% url 'ofertas:leve3' %}" class="{% if secao == 'leve3' %}ativo{% endif %}">Leve 3 Pague 2</a>
         <a href="{% url 'ofertas:cestoes' %}" class="{% if secao == 'cestoes' %}ativo{% endif %}">Cestões</a>
         <a href="{% url 'ofertas:supracorp' %}" class="{% if secao == 'supracorp' %}ativo{% endif %}">Supra Corp Day</a>
-        <a href="{% url 'ofertas:marketing' %}" class="{% if secao == 'marketing' %}ativo{% endif %}">Itens do Marketing</a>
-        <a href="{% url 'ofertas:kimberly' %}" class="{% if secao == 'kimberly' %}ativo{% endif %}">Kimberly</a>
-
-        <div class="grupo-titulo">Impacto por fabricante</div>
         <a href="{% url 'ofertas:impacto_fabricante' 'kenvue' %}" class="{% if secao == 'fabricante_kenvue' %}ativo{% endif %}">Kenvue</a>
         <a href="{% url 'ofertas:impacto_fabricante' 'principia' %}" class="{% if secao == 'fabricante_principia' %}ativo{% endif %}">Principia</a>
         <a href="{% url 'ofertas:impacto_fabricante' 'botica' %}" class="{% if secao == 'fabricante_botica' %}ativo{% endif %}">Botica</a>
         <a href="{% url 'ofertas:impacto_fabricante' 'procter' %}" class="{% if secao == 'fabricante_procter' %}ativo{% endif %}">Procter</a>
+        <a href="{% url 'ofertas:marketing' %}" class="{% if secao == 'marketing' %}ativo{% endif %}">Itens do Marketing</a>
+        <a href="{% url 'ofertas:kimberly' %}" class="{% if secao == 'kimberly' %}ativo{% endif %}">Kimberly</a>
 
         <div class="grupo-titulo">Sistema</div>
         <a href="/admin/">Admin</a>

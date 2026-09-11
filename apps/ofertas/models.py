@@ -5,10 +5,10 @@ from apps.lojas.models import Loja
 
 class Lancamento(models.Model):
     """Uma linha de venda agregada (loja × produto × mês, ou × dia quando o
-    relatório é diário), já classificada numa das 9 mecânicas de oferta
+    relatório é diário), já classificada numa das 9 ações de oferta
     monitoradas.
 
-    Sem pré-agregação: os cálculos por mecânica (ciclos, investimento,
+    Sem pré-agregação: os cálculos por ação (ciclos, investimento,
     impacto, margem ajustada) são feitos em cima destas linhas no momento
     da consulta — granular o suficiente pra o filtro de bandeira funcionar
     em qualquer combinação (ver seção 9 do Painel_de_Ofertas_Documentacao).
@@ -35,7 +35,7 @@ class Lancamento(models.Model):
         (MARKETING, 'Itens do Marketing'),
     ]
 
-    # dentro de uma mecânica de fabricante (Kenvue/Principia/Botica/Procter),
+    # dentro de uma oferta de fabricante (Kenvue/Principia/Botica/Procter),
     # a linha "base" é a venda sem desconto e a "oferta" é a venda com a tag
     # de promoção do fabricante — usado pra separar as duas séries.
     GRUPO_BASE = 'base'
@@ -45,7 +45,7 @@ class Lancamento(models.Model):
         (GRUPO_OFERTA, 'Oferta'),
     ]
 
-    mecanica = models.CharField('mecânica', max_length=20, choices=MECANICA_CHOICES)
+    mecanica = models.CharField('ação', max_length=20, choices=MECANICA_CHOICES)
     loja = models.ForeignKey(Loja, on_delete=models.PROTECT, related_name='lancamentos')
 
     produto_descricao = models.CharField('produto', max_length=255)
@@ -59,7 +59,7 @@ class Lancamento(models.Model):
     )
     grupo = models.CharField(
         'grupo', max_length=10, choices=GRUPO_CHOICES, blank=True,
-        help_text='Só usado nas mecânicas de fabricante (base vs. oferta).',
+        help_text='Só usado nas ofertas de fabricante (base vs. oferta).',
     )
 
     ano_mes = models.CharField('ano-mês', max_length=7, help_text='formato AAAA-MM')

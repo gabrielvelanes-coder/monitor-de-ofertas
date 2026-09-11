@@ -25,12 +25,32 @@
 </div>
 
 <div class="grafico-card">
-  <h3 style="margin-top:0;">Venda por mês</h3>
+  <h3 style="margin-top:0;">Venda por mês <small style="color:var(--muted); font-weight:400;">— clique num produto embaixo pra ver a série dele</small></h3>
   <canvas id="grafico-marketing"></canvas>
 </div>
 {{ grafico|json_script:"dados-grafico-marketing" }}
+{{ series_produtos|json_script:"dados-series-produtos-marketing" }}
 
-<h3>Venda por fabricante</h3>
+<h3>Venda por bandeira</h3>
+<table class="tabela-interativa">
+  <thead>
+    <tr><th>Bandeira</th><th>Itens</th><th>Venda</th><th>Lucro</th></tr>
+  </thead>
+  <tbody>
+    {% for b in ranking_bandeiras %}
+      <tr>
+        <td>{{ b.bandeira }}</td>
+        <td>{{ b.itens|numero }}</td>
+        <td>{{ b.venda|brl }}</td>
+        <td>{{ b.lucro|brl }}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="4" class="vazio">Sem dados.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<h3 style="margin-top:24px;">Venda por fabricante</h3>
 <table id="tabela-fabricantes" class="tabela-interativa">
   <thead>
     <tr><th>Fabricante</th><th>Itens</th><th>Venda</th><th>Lucro</th></tr>
@@ -58,7 +78,7 @@
   </thead>
   <tbody>
     {% for p in produtos %}
-      <tr>
+      <tr class="linha-clicavel" data-produto="{{ p.produto }}">
         <td>{{ p.produto }}</td>
         <td>{{ p.itens|numero }}</td>
         <td>{{ p.venda|brl }}</td>
@@ -74,6 +94,11 @@
 {% block extra_js %}
 <script>
   var dados = JSON.parse(document.getElementById('dados-grafico-marketing').textContent);
-  graficoLinha('grafico-marketing', dados.labels, dados.series);
+  var chart = graficoLinha('grafico-marketing', dados.labels, dados.series);
+  var seriesProdutos = JSON.parse(document.getElementById('dados-series-produtos-marketing').textContent);
+  var destacarProduto = iniciarDrillDown(chart, seriesProdutos, 'Venda');
+  document.querySelectorAll('#tabela-produtos .linha-clicavel').forEach(function (tr) {
+    tr.addEventListener('click', function () { destacarProduto(tr.dataset.produto); });
+  });
 </script>
 {% endblock %}

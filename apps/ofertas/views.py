@@ -1,4 +1,5 @@
-from django.db.models import Count
+from decimal import Decimal
+
 from django.http import Http404
 from django.shortcuts import render
 
@@ -6,11 +7,13 @@ from apps.lojas.models import Loja
 
 from .models import Lancamento
 from .services import (
-    MECANICAS_INFO, bandeira_da_request, calcular_cestoes,
+    ACOES_INFO, bandeira_da_request, calcular_cestoes,
     calcular_impacto_fabricante, calcular_kimberly, calcular_leve3,
     calcular_marketing, calcular_supracorp, filtrar_por_bandeira,
     grafico_mensal, querystring_extra,
 )
+
+ZERO = Decimal('0')
 
 FABRICANTES = {
     'kenvue': (Lancamento.KENVUE, 'Kenvue'),
@@ -20,33 +23,81 @@ FABRICANTES = {
 }
 
 
+def _resumo_executivo(bandeira):
+    """1 linha por ação, com a fatia de venda/lucro/itens que representa a
+    oferta (não o catálogo de referência inteiro) — pra home funcionar como
+    dashboard executivo."""
+    def qs(mecanica):
+        return filtrar_por_bandeira(Lancamento.objects.filter(mecanica=mecanica), bandeira)
+
+    acoes = []
+
+    d = calcular_leve3(qs(Lancamento.LEVE3))
+    acoes.append({
+        'chave': 'leve3', 'rotulo': 'Leve 3 Pague 2', 'url': 'ofertas:leve3',
+        'venda': d['kpis']['venda'], 'lucro': d['kpis']['margem_ajustada'], 'itens': d['kpis']['itens'],
+    })
+
+    d = calcular_cestoes(qs(Lancamento.CESTOES))
+    acoes.append({
+        'chave': 'cestoes', 'rotulo': 'Cestões', 'url': 'ofertas:cestoes',
+        'venda': d['kpis']['venda'], 'lucro': d['kpis']['lucro'], 'itens': d['kpis']['itens'],
+    })
+
+    d = calcular_supracorp(qs(Lancamento.SUPRACORP))
+    acoes.append({
+        'chave': 'supracorp', 'rotulo': 'Supra Corp Day', 'url': 'ofertas:supracorp',
+        'venda': d['kpis']['venda_evento'], 'lucro': ZERO, 'itens': d['kpis']['itens_evento'],
+    })
+
+    for fab_chave, (mecanica, rotulo) in FABRICANTES.items():
+        d = calcular_impacto_fabricante(qs(mecanica))
+        acoes.append({
+            'chave': fab_chave, 'rotulo': rotulo, 'url': 'ofertas:impacto_fabricante', 'url_arg': fab_chave,
+            'venda': d['kpis']['venda_oferta'], 'lucro': d['kpis']['lucro_oferta'], 'itens': d['kpis']['itens_oferta'],
+        })
+
+    d = calcular_marketing(qs(Lancamento.MARKETING))
+    acoes.append({
+        'chave': 'marketing', 'rotulo': 'Itens do Marketing', 'url': 'ofertas:marketing',
+        'venda': d['kpis']['venda'], 'lucro': d['kpis']['lucro'], 'itens': d['kpis']['itens'],
+    })
+
+    d = calcular_kimberly(qs(Lancamento.KIMBERLY))
+    acoes.append({
+        'chave': 'kimberly', 'rotulo': 'Kimberly', 'url': 'ofertas:kimberly',
+        'venda': d['kpis_oferta']['venda'], 'lucro': d['kpis_oferta']['lucro'], 'itens': d['kpis_oferta']['itens'],
+    })
+
+    acoes.sort(key=lambda a: a['venda'], reverse=True)
+    return {
+        'acoes': acoes,
+        'total_venda': sum((a['venda'] for a in acoes), ZERO),
+        'total_lucro': sum((a['lucro'] for a in acoes), ZERO),
+        'total_itens': sum((a['itens'] for a in acoes), ZERO),
+    }
+
+
 def home(request):
     bandeira = bandeira_da_request(request)
 
-    lojas = Loja.objects.filter(bandeira=bandeira) if bandeira else Loja.objects.all()
-    total_lojas = lojas.count()
     lojas_velanes = Loja.objects.filter(bandeira=Loja.VELANES).count()
     lojas_ultra = Loja.objects.filter(bandeira=Loja.ULTRA_POPULAR).count()
 
-    contagem_por_mecanica = dict(
-        filtrar_por_bandeira(Lancamento.objects.all(), bandeira)
-        .values_list('mecanica')
-        .annotate(total=Count('id'))
-        .values_list('mecanica', 'total')
-    )
-    mecanicas = [
-        {'chave': chave, 'rotulo': rotulo, 'lancamentos': contagem_por_mecanica.get(chave, 0)}
-        for chave, rotulo in MECANICAS_INFO
-    ]
+    resumo = _resumo_executivo(bandeira)
+    grafico = {
+        'labels': [a['rotulo'] for a in resumo['acoes']],
+        'series': [{'label': 'Venda', 'data': [float(a['venda']) for a in resumo['acoes']]}],
+    }
 
     contexto = {
         'secao': 'home',
         'bandeira_atual': bandeira,
         'querystring_extra': querystring_extra(request),
-        'total_lojas': total_lojas,
         'lojas_velanes': lojas_velanes,
         'lojas_ultra': lojas_ultra,
-        'mecanicas': mecanicas,
+        'grafico': grafico,
+        **resumo,
     }
     return render(request, 'ofertas/home.html', contexto)
 
@@ -137,10 +188,11 @@ def impacto_fabricante(request, fabricante):
     mecanica, rotulo = FABRICANTES[fabricante]
 
     bandeira = bandeira_da_request(request)
+    busca = request.GET.get('busca', '').strip()
     queryset = filtrar_por_bandeira(
         Lancamento.objects.filter(mecanica=mecanica), bandeira
     )
-    dados = calcular_impacto_fabricante(queryset)
+    dados = calcular_impacto_fabricante(queryset, busca=busca)
     grafico = grafico_mensal(dados['por_mes'], [
         ('venda_base', 'Venda base'), ('venda_oferta', 'Venda oferta'),
     ])
@@ -149,11 +201,9 @@ def impacto_fabricante(request, fabricante):
         'secao': f'fabricante_{fabricante}',
         'bandeira_atual': bandeira,
         'querystring_extra': querystring_extra(request),
+        'busca': busca,
         'fabricante_chave': fabricante,
         'fabricante_rotulo': rotulo,
-        'fabricantes': [
-            {'chave': chave, 'rotulo': rotulo} for chave, (_, rotulo) in FABRICANTES.items()
-        ],
         'grafico': grafico,
         **dados,
     }

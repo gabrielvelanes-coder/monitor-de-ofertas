@@ -33,6 +33,36 @@
     });
   };
 
+  // Drill-down: clicar numa linha da tabela (produto, fabricante...) troca
+  // uma linha extra destacada no gráfico pela série mensal daquele item,
+  // sem recarregar a página. `seriesPorItem` = {nome: [valores por mês]}.
+  window.iniciarDrillDown = function (chart, seriesPorItem, rotuloMetrica) {
+    var datasetExtra = null;
+    return function (nome) {
+      if (datasetExtra) {
+        var i = chart.data.datasets.indexOf(datasetExtra);
+        if (i !== -1) chart.data.datasets.splice(i, 1);
+        if (datasetExtra.label === (rotuloMetrica ? nome + ' — ' + rotuloMetrica : nome)) {
+          datasetExtra = null;
+          chart.options.plugins.legend.display = chart.data.datasets.length > 1;
+          chart.update();
+          return;
+        }
+      }
+      if (seriesPorItem[nome]) {
+        datasetExtra = {
+          label: rotuloMetrica ? nome + ' — ' + rotuloMetrica : nome,
+          data: seriesPorItem[nome],
+          borderColor: '#c93f6f', backgroundColor: '#c93f6f',
+          borderWidth: 3, tension: 0.25, pointRadius: 4,
+        };
+        chart.data.datasets.push(datasetExtra);
+      }
+      chart.options.plugins.legend.display = true;
+      chart.update();
+    };
+  };
+
   window.graficoBarra = function (canvasId, labels, series, destaqueIndices) {
     var elemento = document.getElementById(canvasId);
     if (!elemento) return null;

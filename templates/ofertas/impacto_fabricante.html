@@ -3,7 +3,7 @@
 {% block title %}{{ fabricante_rotulo }}{% endblock %}
 {% block conteudo %}
 
-<h2>Impacto por fabricante <small style="color:var(--muted); font-weight:400;">— {{ fabricante_rotulo }}</small></h2>
+<h2>Oferta {{ fabricante_rotulo }}</h2>
 <p style="color:var(--muted); font-size:13.5px; margin-top:-8px;">
   Mecânica de verba pendente de definição (docx, seção 5.3) — esta tela mostra só volume/venda/margem.
 </p>
@@ -23,13 +23,35 @@
 </div>
 
 <div class="grafico-card">
-  <h3 style="margin-top:0;">Venda por mês — base vs. oferta</h3>
+  <h3 style="margin-top:0;">Venda por mês — base vs. oferta <small style="color:var(--muted); font-weight:400;">— clique num produto embaixo pra ver a série dele</small></h3>
   <canvas id="grafico-fabricante"></canvas>
 </div>
 {{ grafico|json_script:"dados-grafico-fabricante" }}
+{{ series_produtos|json_script:"dados-series-produtos-fabricante" }}
 
-<h3>Lojas com maior venda na promoção</h3>
-<table id="tabela-lojas" class="tabela-interativa">
+<h3>Lojas</h3>
+<div class="abas" style="margin-bottom:10px;">
+  <a href="#" class="ativa" data-grupo="lojas-fabricante" data-valor="macro" onclick="alternarPainel(this); return false;">Por bandeira</a>
+  <a href="#" data-grupo="lojas-fabricante" data-valor="detalhe" onclick="alternarPainel(this); return false;">Loja a loja</a>
+</div>
+<table data-painel="lojas-fabricante" data-valor="macro" class="tabela-interativa">
+  <thead>
+    <tr><th>Bandeira</th><th>Itens</th><th>Venda</th><th>Lucro</th></tr>
+  </thead>
+  <tbody>
+    {% for b in ranking_bandeiras %}
+      <tr>
+        <td>{{ b.bandeira }}</td>
+        <td>{{ b.itens_oferta|numero }}</td>
+        <td>{{ b.venda_oferta|brl }}</td>
+        <td>{{ b.lucro_oferta|brl }}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="4" class="vazio">Sem dados.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+<table data-painel="lojas-fabricante" data-valor="detalhe" class="tabela-interativa" hidden>
   <thead>
     <tr><th>Loja</th><th>Bandeira</th><th>Itens</th><th>Venda</th><th>Lucro</th></tr>
   </thead>
@@ -48,10 +70,36 @@
   </tbody>
 </table>
 
+<h3 style="margin-top:24px;">Produtos na oferta</h3>
+<input type="text" id="busca-produto" data-filtro-tabela="tabela-produtos" value="{{ busca }}"
+       placeholder="Buscar produto… (filtra na hora)" class="campo-busca" style="margin-bottom:10px;">
+<table id="tabela-produtos" class="tabela-interativa">
+  <thead>
+    <tr><th>Produto</th><th>Itens</th><th>Venda</th><th>Lucro</th></tr>
+  </thead>
+  <tbody>
+    {% for p in produtos %}
+      <tr class="linha-clicavel" data-produto="{{ p.produto }}">
+        <td>{{ p.produto }}</td>
+        <td>{{ p.itens_oferta|numero }}</td>
+        <td>{{ p.venda_oferta|brl }}</td>
+        <td>{{ p.lucro_oferta|brl }}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="4" class="vazio">Sem dados.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
 {% endblock %}
 {% block extra_js %}
 <script>
   var dados = JSON.parse(document.getElementById('dados-grafico-fabricante').textContent);
-  graficoLinha('grafico-fabricante', dados.labels, dados.series);
+  var chart = graficoLinha('grafico-fabricante', dados.labels, dados.series);
+  var seriesProdutos = JSON.parse(document.getElementById('dados-series-produtos-fabricante').textContent);
+  var destacarProduto = iniciarDrillDown(chart, seriesProdutos, 'Venda oferta');
+  document.querySelectorAll('#tabela-produtos .linha-clicavel').forEach(function (tr) {
+    tr.addEventListener('click', function () { destacarProduto(tr.dataset.produto); });
+  });
 </script>
 {% endblock %}

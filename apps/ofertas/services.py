@@ -1,9 +1,14 @@
-"""Serviços de cálculo por mecânica de oferta.
+"""Serviços de cálculo por ação de oferta.
 
-Cada `calcular_<mecanica>(queryset)` recebe um queryset de `Lancamento` já
-filtrado por mecânica (e por bandeira, se for o caso) e devolve os números
+Cada `calcular_<ação>(queryset)` recebe um queryset de `Lancamento` já
+filtrado por ação (e por bandeira, se for o caso) e devolve os números
 prontos pra tela — sem pré-agregação em banco, pra granularidade bater com
 o filtro de bandeira em qualquer combinação (ver docx, seção 9).
+
+Cada função também devolve, além da visão "loja a loja", uma visão macro
+por bandeira (`ranking_bandeiras`) e uma série mensal por produto/grupo
+alinhada aos mesmos meses do gráfico geral (`series_produtos`), usada pra
+trocar a linha do gráfico ao clicar numa linha da tabela.
 """
 from __future__ import annotations
 
@@ -15,6 +20,7 @@ from decimal import Decimal
 from .models import Lancamento
 
 ZERO = Decimal('0')
+ROTULOS_BANDEIRA = {'velanes': 'Velanes', 'ultra_popular': 'Ultra Popular'}
 
 # Evento pontual de degustação Supra Corp Day (docx, seção 5.2) — data fixa,
 # não um padrão recorrente. Se um novo evento acontecer, este valor (e o
@@ -56,6 +62,32 @@ def grafico_mensal(por_mes, campos) -> dict:
     return {'labels': labels, 'series': series}
 
 
+def agrupar_por_bandeira(por_loja_items, campos) -> list:
+    """Soma `campos` (numéricos, aditivos) de uma lista loja-a-loja em até
+    2 linhas por bandeira — a visão "macro" ao lado do loja-a-loja. Só serve
+    pra campos que são soma pura (venda, itens, investimento...); campos que
+    são razão (margem %, impacto) precisam ser recalculados à parte."""
+    agregados = {}
+    for item in por_loja_items:
+        chave = item['bandeira']
+        alvo = agregados.setdefault(
+            chave, {'bandeira': ROTULOS_BANDEIRA.get(chave, chave), **{c: ZERO for c in campos}}
+        )
+        for c in campos:
+            alvo[c] += item.get(c) or ZERO
+    return [agregados[c] for c in ('velanes', 'ultra_popular') if c in agregados]
+
+
+def alinhar_com_labels(acumulador, labels) -> dict:
+    """{chave: {ano_mes: valor}} -> {chave: [valores alinhados a `labels`]}
+    — pronto pro JS trocar a linha do gráfico ao clicar numa linha da
+    tabela (produto, fabricante etc.)."""
+    return {
+        chave: [float(meses.get(mes, ZERO)) for mes in labels]
+        for chave, meses in acumulador.items()
+    }
+
+
 def calcular_leve3(queryset, busca: str = ''):
     """Leve 3 Pague 2 (docx, seção 5.1 e 6):
     ciclos = INT(itens / 3); investimento = ciclos × (custo da linha / itens
@@ -76,6 +108,7 @@ def calcular_leve3(queryset, busca: str = ''):
     por_mes = defaultdict(lambda: {'investimento': ZERO, 'margem_contabil': ZERO, 'margem_ajustada': ZERO})
     por_loja = defaultdict(lambda: {'codigo': '', 'bandeira': '', 'margem_contabil': ZERO, 'margem_ajustada': ZERO, 'investimento': ZERO})
     por_produto = defaultdict(lambda: {'itens': ZERO, 'ciclos': ZERO, 'investimento': ZERO, 'venda': ZERO, 'custo': ZERO, 'lucro': ZERO})
+    por_produto_mes = defaultdict(lambda: defaultdict(lambda: ZERO))
 
     for linha in linhas:
         itens = linha['itens'] or ZERO
@@ -113,12 +146,16 @@ def calcular_leve3(queryset, busca: str = ''):
         produto['venda'] += venda
         produto['custo'] += custo
         produto['lucro'] += lucro
+        por_produto_mes[linha['produto_descricao']][linha['ano_mes']] += investimento
 
     produtos = [
         {'produto': nome, **valores} for nome, valores in por_produto.items()
         if not busca or busca.lower() in nome.lower()
     ]
     produtos.sort(key=lambda p: p['venda'], reverse=True)
+
+    por_mes_lista = [{'ano_mes': mes, **valores} for mes, valores in sorted(por_mes.items())]
+    labels = [item['ano_mes'] for item in por_mes_lista]
 
     return {
         'kpis': {
@@ -129,11 +166,13 @@ def calcular_leve3(queryset, busca: str = ''):
             'margem_contabil': total_margem_contabil,
             'margem_ajustada': total_margem_contabil + total_investimento,
         },
-        'por_mes': [
-            {'ano_mes': mes, **valores} for mes, valores in sorted(por_mes.items())
-        ],
+        'por_mes': por_mes_lista,
         'ranking_lojas': sorted(por_loja.values(), key=lambda l: l['investimento'], reverse=True),
+        'ranking_bandeiras': agrupar_por_bandeira(
+            por_loja.values(), ['investimento', 'margem_contabil', 'margem_ajustada']
+        ),
         'produtos': produtos,
+        'series_produtos': alinhar_com_labels(por_produto_mes, labels),
     }
 
 
@@ -154,6 +193,7 @@ def calcular_cestoes(queryset, busca: str = ''):
     por_mes = defaultdict(lambda: {'itens': ZERO, 'venda': ZERO, 'lucro': ZERO})
     por_loja = defaultdict(lambda: {'codigo': '', 'bandeira': '', 'itens': ZERO, 'venda': ZERO, 'lucro': ZERO})
     por_produto = defaultdict(lambda: {'itens': ZERO, 'venda': ZERO, 'custo': ZERO, 'lucro': ZERO})
+    por_produto_mes = defaultdict(lambda: defaultdict(lambda: ZERO))
 
     for linha in linhas:
         itens = linha['itens'] or ZERO
@@ -183,6 +223,7 @@ def calcular_cestoes(queryset, busca: str = ''):
         produto['venda'] += venda
         produto['custo'] += custo
         produto['lucro'] += lucro
+        por_produto_mes[linha['produto_descricao']][linha['ano_mes']] += venda
 
     produtos = [
         {'produto': nome, **valores} for nome, valores in por_produto.items()
@@ -191,6 +232,8 @@ def calcular_cestoes(queryset, busca: str = ''):
     produtos.sort(key=lambda p: p['venda'], reverse=True)
 
     margem_pct = (total_lucro / total_venda * 100) if total_venda else ZERO
+    por_mes_lista = [{'ano_mes': mes, **valores} for mes, valores in sorted(por_mes.items())]
+    labels = [item['ano_mes'] for item in por_mes_lista]
 
     return {
         'kpis': {
@@ -200,18 +243,18 @@ def calcular_cestoes(queryset, busca: str = ''):
             'margem_pct': margem_pct,
             'produtos': len(por_produto),
         },
-        'por_mes': [
-            {'ano_mes': mes, **valores} for mes, valores in sorted(por_mes.items())
-        ],
+        'por_mes': por_mes_lista,
         'ranking_lojas': sorted(por_loja.values(), key=lambda l: l['venda'], reverse=True),
+        'ranking_bandeiras': agrupar_por_bandeira(por_loja.values(), ['itens', 'venda', 'lucro']),
         'produtos': produtos,
+        'series_produtos': alinhar_com_labels(por_produto_mes, labels),
     }
 
 
 def calcular_supracorp(queryset):
     """Degustação Supra Corp Day (docx, seção 5.2): impacto = itens vendidos
     na janela do evento (dia do evento + o dia seguinte) ÷ média diária de
-    vendas no resto do mês — geral, por loja e por produto."""
+    vendas no resto do mês — geral, por loja/bandeira e por produto."""
     linhas = list(queryset.select_related('loja').values(
         'loja_id', 'loja__codigo', 'loja__bandeira', 'produto_descricao',
         'data', 'itens', 'venda',
@@ -225,7 +268,9 @@ def calcular_supracorp(queryset):
         'codigo': '', 'bandeira': '',
         'itens_evento': ZERO, 'itens_resto': ZERO,
     })
+    por_bandeira_raw = defaultdict(lambda: {'itens_evento': ZERO, 'itens_resto': ZERO})
     por_produto = defaultdict(lambda: {'itens_evento': ZERO, 'venda_evento': ZERO})
+    por_produto_mes = defaultdict(lambda: defaultdict(lambda: ZERO))
 
     total_itens_evento = ZERO
     total_venda_evento = ZERO
@@ -238,6 +283,7 @@ def calcular_supracorp(queryset):
         itens = linha['itens'] or ZERO
         venda = linha['venda'] or ZERO
         na_janela = data in JANELA_SUPRACORP
+        ano_mes = f'{data.year:04d}-{data.month:02d}'
 
         dia = por_dia[data]
         dia['itens'] += itens
@@ -246,17 +292,21 @@ def calcular_supracorp(queryset):
         loja = por_loja[linha['loja_id']]
         loja['codigo'] = linha['loja__codigo']
         loja['bandeira'] = linha['loja__bandeira']
+        bandeira_raw = por_bandeira_raw[linha['loja__bandeira']]
 
         if na_janela:
             total_itens_evento += itens
             total_venda_evento += venda
             loja['itens_evento'] += itens
+            bandeira_raw['itens_evento'] += itens
             produto = por_produto[linha['produto_descricao']]
             produto['itens_evento'] += itens
             produto['venda_evento'] += venda
         else:
             total_itens_resto += itens
             loja['itens_resto'] += itens
+            bandeira_raw['itens_resto'] += itens
+            por_produto_mes[linha['produto_descricao']][ano_mes] += itens
 
     media_diaria_geral = (total_itens_resto / dias_resto) if dias_resto else ZERO
     impacto_geral = (total_itens_evento / media_diaria_geral) if media_diaria_geral else None
@@ -267,6 +317,18 @@ def calcular_supracorp(queryset):
         impacto = (loja['itens_evento'] / media) if media else None
         ranking_lojas.append({**loja, 'media_diaria': media, 'impacto': impacto})
     ranking_lojas.sort(key=lambda l: l['itens_evento'], reverse=True)
+
+    ranking_bandeiras = []
+    for chave in ('velanes', 'ultra_popular'):
+        if chave not in por_bandeira_raw:
+            continue
+        d = por_bandeira_raw[chave]
+        media = (d['itens_resto'] / dias_resto) if dias_resto else ZERO
+        impacto = (d['itens_evento'] / media) if media else None
+        ranking_bandeiras.append({
+            'bandeira': ROTULOS_BANDEIRA[chave], 'itens_evento': d['itens_evento'],
+            'media_diaria': media, 'impacto': impacto,
+        })
 
     produtos = sorted(por_produto.items(), key=lambda kv: kv[1]['venda_evento'], reverse=True)
     produtos = [{'produto': nome, **valores} for nome, valores in produtos]
@@ -285,18 +347,19 @@ def calcular_supracorp(queryset):
         },
         'serie_diaria': serie_diaria,
         'ranking_lojas': ranking_lojas,
+        'ranking_bandeiras': ranking_bandeiras,
         'produtos': produtos,
         'evento_data': EVENTO_SUPRACORP,
     }
 
 
-def calcular_impacto_fabricante(queryset):
-    """Impacto por fabricante — Kenvue/Principia/Botica/Procter (docx,
-    seção 5.3): compara volume/venda/margem "sem desconto" (base) com a
-    promoção do fabricante, mês a mês e por loja."""
+def calcular_impacto_fabricante(queryset, busca: str = ''):
+    """Oferta por fabricante — Kenvue/Principia/Botica/Procter (docx, seção
+    5.3): compara volume/venda/margem "sem desconto" (base) com a promoção
+    do fabricante, mês a mês, por loja/bandeira e por produto."""
     linhas = queryset.select_related('loja').values(
-        'loja_id', 'loja__codigo', 'loja__bandeira', 'grupo', 'ano_mes',
-        'itens', 'venda', 'custo', 'lucro',
+        'loja_id', 'loja__codigo', 'loja__bandeira', 'produto_descricao',
+        'grupo', 'ano_mes', 'itens', 'venda', 'custo', 'lucro',
     )
 
     por_mes = defaultdict(lambda: {
@@ -307,6 +370,8 @@ def calcular_impacto_fabricante(queryset):
         'codigo': '', 'bandeira': '',
         'itens_oferta': ZERO, 'venda_oferta': ZERO, 'lucro_oferta': ZERO,
     })
+    por_produto = defaultdict(lambda: {'itens_oferta': ZERO, 'venda_oferta': ZERO, 'lucro_oferta': ZERO})
+    por_produto_mes = defaultdict(lambda: defaultdict(lambda: ZERO))
 
     totais = {g: {'itens': ZERO, 'venda': ZERO, 'custo': ZERO, 'lucro': ZERO}
               for g in (Lancamento.GRUPO_BASE, Lancamento.GRUPO_OFERTA)}
@@ -337,6 +402,12 @@ def calcular_impacto_fabricante(queryset):
             loja['venda_oferta'] += venda
             loja['lucro_oferta'] += lucro
 
+            produto = por_produto[linha['produto_descricao']]
+            produto['itens_oferta'] += itens
+            produto['venda_oferta'] += venda
+            produto['lucro_oferta'] += lucro
+            por_produto_mes[linha['produto_descricao']][linha['ano_mes']] += venda
+
     def _margem_pct(g):
         venda = totais[g]['venda']
         return (totais[g]['lucro'] / venda * 100) if venda else ZERO
@@ -351,14 +422,24 @@ def calcular_impacto_fabricante(queryset):
         'margem_oferta_pct': _margem_pct(Lancamento.GRUPO_OFERTA),
     }
 
+    produtos = [
+        {'produto': nome, **valores} for nome, valores in por_produto.items()
+        if not busca or busca.lower() in nome.lower()
+    ]
+    produtos.sort(key=lambda p: p['venda_oferta'], reverse=True)
+
+    por_mes_lista = [{'ano_mes': mes, **valores} for mes, valores in sorted(por_mes.items())]
+    labels = [item['ano_mes'] for item in por_mes_lista]
+
     return {
         'kpis': kpis,
-        'por_mes': [
-            {'ano_mes': mes, **valores} for mes, valores in sorted(por_mes.items())
-        ],
-        'ranking_lojas': sorted(
-            por_loja.values(), key=lambda l: l['venda_oferta'], reverse=True
+        'por_mes': por_mes_lista,
+        'ranking_lojas': sorted(por_loja.values(), key=lambda l: l['venda_oferta'], reverse=True),
+        'ranking_bandeiras': agrupar_por_bandeira(
+            por_loja.values(), ['itens_oferta', 'venda_oferta', 'lucro_oferta']
         ),
+        'produtos': produtos,
+        'series_produtos': alinhar_com_labels(por_produto_mes, labels),
     }
 
 
@@ -376,7 +457,9 @@ def calcular_marketing(queryset, busca: str = ''):
 
     por_mes = defaultdict(lambda: {'itens': ZERO, 'venda': ZERO, 'lucro': ZERO})
     por_fabricante = defaultdict(lambda: {'itens': ZERO, 'venda': ZERO, 'lucro': ZERO})
+    por_loja = defaultdict(lambda: {'codigo': '', 'bandeira': '', 'itens': ZERO, 'venda': ZERO, 'lucro': ZERO})
     por_produto = defaultdict(lambda: {'itens': ZERO, 'venda': ZERO, 'custo': ZERO, 'lucro': ZERO})
+    por_produto_mes = defaultdict(lambda: defaultdict(lambda: ZERO))
 
     for linha in linhas:
         itens = linha['itens'] or ZERO
@@ -398,17 +481,28 @@ def calcular_marketing(queryset, busca: str = ''):
         fabricante['venda'] += venda
         fabricante['lucro'] += lucro
 
+        loja = por_loja[linha['loja_id']]
+        loja['codigo'] = linha['loja__codigo']
+        loja['bandeira'] = linha['loja__bandeira']
+        loja['itens'] += itens
+        loja['venda'] += venda
+        loja['lucro'] += lucro
+
         produto = por_produto[linha['produto_descricao']]
         produto['itens'] += itens
         produto['venda'] += venda
         produto['custo'] += custo
         produto['lucro'] += lucro
+        por_produto_mes[linha['produto_descricao']][linha['ano_mes']] += venda
 
     produtos = [
         {'produto': nome, **valores} for nome, valores in por_produto.items()
         if not busca or busca.lower() in nome.lower()
     ]
     produtos.sort(key=lambda p: p['venda'], reverse=True)
+
+    por_mes_lista = [{'ano_mes': mes, **valores} for mes, valores in sorted(por_mes.items())]
+    labels = [item['ano_mes'] for item in por_mes_lista]
 
     return {
         'kpis': {
@@ -417,14 +511,14 @@ def calcular_marketing(queryset, busca: str = ''):
             'lucro': total_lucro,
             'produtos': len(por_produto),
         },
-        'por_mes': [
-            {'ano_mes': mes, **valores} for mes, valores in sorted(por_mes.items())
-        ],
+        'por_mes': por_mes_lista,
         'por_fabricante': sorted(
             [{'fabricante': nome, **valores} for nome, valores in por_fabricante.items()],
             key=lambda f: f['venda'], reverse=True,
         ),
+        'ranking_bandeiras': agrupar_por_bandeira(por_loja.values(), ['itens', 'venda', 'lucro']),
         'produtos': produtos,
+        'series_produtos': alinhar_com_labels(por_produto_mes, labels),
     }
 
 
@@ -447,7 +541,9 @@ def calcular_kimberly(queryset, busca: str = ''):
     oferta_lucro = ZERO
 
     por_mes = defaultdict(lambda: {'itens': ZERO, 'venda': ZERO, 'lucro': ZERO})
+    por_loja = defaultdict(lambda: {'codigo': '', 'bandeira': '', 'itens': ZERO, 'venda': ZERO, 'lucro': ZERO})
     por_produto = defaultdict(lambda: {'itens': ZERO, 'venda': ZERO, 'custo': ZERO, 'lucro': ZERO, 'em_oferta': False})
+    por_produto_mes = defaultdict(lambda: defaultdict(lambda: ZERO))
 
     for linha in linhas:
         itens = linha['itens'] or ZERO
@@ -469,18 +565,29 @@ def calcular_kimberly(queryset, busca: str = ''):
         mes['venda'] += venda
         mes['lucro'] += lucro
 
+        loja = por_loja[linha['loja_id']]
+        loja['codigo'] = linha['loja__codigo']
+        loja['bandeira'] = linha['loja__bandeira']
+        loja['itens'] += itens
+        loja['venda'] += venda
+        loja['lucro'] += lucro
+
         produto = por_produto[linha['produto_descricao']]
         produto['itens'] += itens
         produto['venda'] += venda
         produto['custo'] += custo
         produto['lucro'] += lucro
         produto['em_oferta'] = produto['em_oferta'] or em_oferta
+        por_produto_mes[linha['produto_descricao']][linha['ano_mes']] += venda
 
     produtos = [
         {'produto': nome, **valores} for nome, valores in por_produto.items()
         if not busca or busca.lower() in nome.lower()
     ]
     produtos.sort(key=lambda p: p['venda'], reverse=True)
+
+    por_mes_lista = [{'ano_mes': mes, **valores} for mes, valores in sorted(por_mes.items())]
+    labels = [item['ano_mes'] for item in por_mes_lista]
 
     return {
         'kpis': {
@@ -491,14 +598,14 @@ def calcular_kimberly(queryset, busca: str = ''):
             'itens': oferta_itens, 'venda': oferta_venda, 'lucro': oferta_lucro,
         },
         'tem_oferta_marcada': oferta_itens > 0,
-        'por_mes': [
-            {'ano_mes': mes, **valores} for mes, valores in sorted(por_mes.items())
-        ],
+        'por_mes': por_mes_lista,
+        'ranking_bandeiras': agrupar_por_bandeira(por_loja.values(), ['itens', 'venda', 'lucro']),
         'produtos': produtos,
+        'series_produtos': alinhar_com_labels(por_produto_mes, labels),
     }
 
 
-MECANICAS_INFO = [
+ACOES_INFO = [
     (Lancamento.LEVE3, 'Leve 3 Pague 2'),
     (Lancamento.SUPRACORP, 'Degustação Supra Corp Day'),
     (Lancamento.KENVUE, 'Ofertas Kenvue'),

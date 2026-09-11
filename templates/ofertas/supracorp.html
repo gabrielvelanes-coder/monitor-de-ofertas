@@ -26,7 +26,28 @@
 {{ grafico|json_script:"dados-grafico-supracorp" }}
 
 <h3 style="margin-top:24px;">Impacto por loja</h3>
-<table id="tabela-lojas" class="tabela-interativa">
+<div class="abas" style="margin-bottom:10px;">
+  <a href="#" class="ativa" data-grupo="lojas-supracorp" data-valor="macro" onclick="alternarPainel(this); return false;">Por bandeira</a>
+  <a href="#" data-grupo="lojas-supracorp" data-valor="detalhe" onclick="alternarPainel(this); return false;">Loja a loja</a>
+</div>
+<table data-painel="lojas-supracorp" data-valor="macro" class="tabela-interativa">
+  <thead>
+    <tr><th>Bandeira</th><th>Itens no evento</th><th>Média diária (resto)</th><th>Impacto</th></tr>
+  </thead>
+  <tbody>
+    {% for b in ranking_bandeiras %}
+      <tr>
+        <td>{{ b.bandeira }}</td>
+        <td>{{ b.itens_evento|numero }}</td>
+        <td>{{ b.media_diaria|numero:2 }}</td>
+        <td>{% if b.impacto %}{{ b.impacto|numero:2 }}×{% else %}—{% endif %}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="4" class="vazio">Sem dados.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+<table data-painel="lojas-supracorp" data-valor="detalhe" class="tabela-interativa" hidden>
   <thead>
     <tr><th>Loja</th><th>Bandeira</th><th>Itens no evento</th><th>Média diária (resto)</th><th>Impacto</th></tr>
   </thead>

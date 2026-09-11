@@ -21,13 +21,35 @@
 </div>
 
 <div class="grafico-card">
-  <h3 style="margin-top:0;">Faturamento por mês</h3>
+  <h3 style="margin-top:0;">Faturamento por mês <small style="color:var(--muted); font-weight:400;">— clique num produto embaixo pra ver a série dele</small></h3>
   <canvas id="grafico-cestoes"></canvas>
 </div>
 {{ grafico|json_script:"dados-grafico-cestoes" }}
+{{ series_produtos|json_script:"dados-series-produtos-cestoes" }}
 
-<h3>Venda por loja</h3>
-<table id="tabela-lojas" class="tabela-interativa">
+<h3>Lojas</h3>
+<div class="abas" style="margin-bottom:10px;">
+  <a href="#" class="ativa" data-grupo="lojas-cestoes" data-valor="macro" onclick="alternarPainel(this); return false;">Por bandeira</a>
+  <a href="#" data-grupo="lojas-cestoes" data-valor="detalhe" onclick="alternarPainel(this); return false;">Loja a loja</a>
+</div>
+<table data-painel="lojas-cestoes" data-valor="macro" class="tabela-interativa">
+  <thead>
+    <tr><th>Bandeira</th><th>Itens</th><th>Venda</th><th>Lucro</th></tr>
+  </thead>
+  <tbody>
+    {% for b in ranking_bandeiras %}
+      <tr>
+        <td>{{ b.bandeira }}</td>
+        <td>{{ b.itens|numero }}</td>
+        <td>{{ b.venda|brl }}</td>
+        <td>{{ b.lucro|brl }}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="4" class="vazio">Sem dados.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+<table data-painel="lojas-cestoes" data-valor="detalhe" class="tabela-interativa" hidden>
   <thead>
     <tr><th>Loja</th><th>Bandeira</th><th>Itens</th><th>Venda</th><th>Lucro</th></tr>
   </thead>
@@ -55,7 +77,7 @@
   </thead>
   <tbody>
     {% for p in produtos %}
-      <tr>
+      <tr class="linha-clicavel" data-produto="{{ p.produto }}">
         <td>{{ p.produto }}</td>
         <td>{{ p.itens|numero }}</td>
         <td>{{ p.venda|brl }}</td>
@@ -71,6 +93,11 @@
 {% block extra_js %}
 <script>
   var dados = JSON.parse(document.getElementById('dados-grafico-cestoes').textContent);
-  graficoLinha('grafico-cestoes', dados.labels, dados.series);
+  var chart = graficoLinha('grafico-cestoes', dados.labels, dados.series);
+  var seriesProdutos = JSON.parse(document.getElementById('dados-series-produtos-cestoes').textContent);
+  var destacarProduto = iniciarDrillDown(chart, seriesProdutos, 'Venda');
+  document.querySelectorAll('#tabela-produtos .linha-clicavel').forEach(function (tr) {
+    tr.addEventListener('click', function () { destacarProduto(tr.dataset.produto); });
+  });
 </script>
 {% endblock %}

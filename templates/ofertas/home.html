@@ -1,44 +1,53 @@
 {% extends "base.html" %}
+{% load ofertas_tags %}
 {% block title %}Início{% endblock %}
 {% block conteudo %}
 
+<h2 style="margin-top:0;">Resumo executivo</h2>
+
 <div class="cards">
-  <div class="card">
-    <div class="rotulo">Lojas (Velanes)</div>
-    <div class="valor">{{ lojas_velanes }}</div>
-  </div>
-  <div class="card">
-    <div class="rotulo">Lojas (Ultra Popular)</div>
-    <div class="valor">{{ lojas_ultra }}</div>
-  </div>
-  <div class="card">
-    <div class="rotulo">Lojas no filtro atual</div>
-    <div class="valor">{{ total_lojas }}</div>
-  </div>
+  <div class="card"><div class="rotulo">Venda em oferta (todas as ações)</div><div class="valor">{{ total_venda|brl }}</div></div>
+  <div class="card"><div class="rotulo">Lucro (todas as ações)</div><div class="valor">{{ total_lucro|brl }}</div></div>
+  <div class="card"><div class="rotulo">Itens vendidos</div><div class="valor">{{ total_itens|numero }}</div></div>
+  <div class="card"><div class="rotulo">Lojas Velanes / Ultra Popular</div><div class="valor">{{ lojas_velanes }} / {{ lojas_ultra }}</div></div>
 </div>
 
-{% if not lojas_velanes and not lojas_ultra %}
+{% if not total_venda %}
   <div class="aviso">
-    Nenhuma loja cadastrada ainda. Copie o cadastro de lojas (.xlsx) pra
-    <code>dados/entrada/</code> e rode <code>python manage.py importar_lojas</code>.
+    Nenhum dado importado ainda. Copie os relatórios pra <code>dados/entrada/</code>
+    e rode os comandos <code>python manage.py importar_*</code> — ver README.
   </div>
 {% endif %}
 
-<table class="tabela-interativa">
+<div class="grafico-card">
+  <h3 style="margin-top:0;">Venda por ação</h3>
+  <canvas id="grafico-home"></canvas>
+</div>
+{{ grafico|json_script:"dados-grafico-home" }}
+
+<h3>Ranking de ações</h3>
+<table id="tabela-acoes" class="tabela-interativa">
   <thead>
-    <tr>
-      <th>Mecânica</th>
-      <th>Lançamentos importados</th>
-    </tr>
+    <tr><th>Ação</th><th>Itens</th><th>Venda</th><th>Lucro</th></tr>
   </thead>
   <tbody>
-    {% for m in mecanicas %}
+    {% for a in acoes %}
       <tr>
-        <td>{{ m.rotulo }}</td>
-        <td>{% if m.lancamentos %}{{ m.lancamentos }}{% else %}<span class="vazio">ainda não importado</span>{% endif %}</td>
+        <td>{% if a.url_arg %}<a href="{% url a.url a.url_arg %}">{{ a.rotulo }}</a>{% else %}<a href="{% url a.url %}">{{ a.rotulo }}</a>{% endif %}</td>
+        <td>{{ a.itens|numero }}</td>
+        <td>{{ a.venda|brl }}</td>
+        <td>{{ a.lucro|brl }}</td>
       </tr>
+    {% empty %}
+      <tr><td colspan="4" class="vazio">Sem dados.</td></tr>
     {% endfor %}
   </tbody>
 </table>
 
+{% endblock %}
+{% block extra_js %}
+<script>
+  var dados = JSON.parse(document.getElementById('dados-grafico-home').textContent);
+  graficoBarra('grafico-home', dados.labels, dados.series);
+</script>
 {% endblock %}

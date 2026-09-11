@@ -67,4 +67,18 @@
     iniciarOrdenacao();
     iniciarFiltro();
   });
+
+  // Alterna entre painéis (ex.: "por bandeira" vs. "loja a loja") sem
+  // round-trip pro servidor: <a data-grupo="g" data-valor="x" onclick="alternarPainel(this)">
+  // mostra só os elementos com data-painel="g" data-valor="x" dentro do mesmo <body>.
+  window.alternarPainel = function (botao) {
+    var grupo = botao.dataset.grupo, valor = botao.dataset.valor;
+    document.querySelectorAll('[data-grupo="' + grupo + '"]').forEach(function (b) {
+      b.classList.remove('ativa');
+    });
+    botao.classList.add('ativa');
+    document.querySelectorAll('[data-painel="' + grupo + '"]').forEach(function (painel) {
+      painel.hidden = painel.dataset.valor !== valor;
+    });
+  };
 })();
