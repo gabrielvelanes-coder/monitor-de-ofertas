@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% load ofertas_tags %}
+{% block title %}Cestões{% endblock %}
+{% block conteudo %}
+
+<h2>Cestões <small style="color:var(--muted); font-weight:400;">— exposição promocional fora do caderno de ofertas</small></h2>
+
+{% if not kpis.itens %}
+  <div class="aviso">
+    Nenhum lançamento importado ainda. Copie <code>CESTOES 2026.xls</code> pra
+    <code>dados/entrada/</code> e rode <code>python manage.py importar_cestoes</code>.
+  </div>
+{% endif %}
+
+<div class="cards">
+  <div class="card"><div class="rotulo">Produtos em cestão</div><div class="valor">{{ kpis.produtos }}</div></div>
+  <div class="card"><div class="rotulo">Itens vendidos</div><div class="valor">{{ kpis.itens|numero }}</div></div>
+  <div class="card"><div class="rotulo">Venda</div><div class="valor">{{ kpis.venda|brl }}</div></div>
+  <div class="card"><div class="rotulo">Lucro</div><div class="valor">{{ kpis.lucro|brl }}</div></div>
+  <div class="card"><div class="rotulo">Margem</div><div class="valor">{{ kpis.margem_pct|numero:1 }}%</div></div>
+</div>
+
+<h3>Faturamento e unidades por mês</h3>
+<table>
+  <thead>
+    <tr><th>Mês</th><th>Itens</th><th>Venda</th><th>Lucro</th></tr>
+  </thead>
+  <tbody>
+    {% for m in por_mes %}
+      <tr>
+        <td>{{ m.ano_mes }}</td>
+        <td>{{ m.itens|numero }}</td>
+        <td>{{ m.venda|brl }}</td>
+        <td>{{ m.lucro|brl }}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="4" class="vazio">Sem dados.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<h3 style="margin-top:24px;">Venda por loja</h3>
+<table>
+  <thead>
+    <tr><th>Loja</th><th>Bandeira</th><th>Itens</th><th>Venda</th><th>Lucro</th></tr>
+  </thead>
+  <tbody>
+    {% for l in ranking_lojas %}
+      <tr>
+        <td>{{ l.codigo }}</td>
+        <td>{{ l.bandeira }}</td>
+        <td>{{ l.itens|numero }}</td>
+        <td>{{ l.venda|brl }}</td>
+        <td>{{ l.lucro|brl }}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="5" class="vazio">Sem dados.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<h3 style="margin-top:24px;">Produtos em cestão</h3>
+<form method="get" style="margin-bottom:10px;">
+  {% if bandeira_atual %}<input type="hidden" name="bandeira" value="{{ bandeira_atual }}">{% endif %}
+  <input type="text" name="busca" value="{{ busca }}" placeholder="Buscar produto…"
+         style="padding:6px 10px; border-radius:6px; border:1px solid var(--border); width:280px;">
+  <button type="submit" style="padding:6px 12px; border-radius:6px; border:1px solid var(--border); background:#fff; cursor:pointer;">Buscar</button>
+</form>
+<table>
+  <thead>
+    <tr><th>Produto</th><th>Itens</th><th>Venda</th><th>Lucro</th></tr>
+  </thead>
+  <tbody>
+    {% for p in produtos %}
+      <tr>
+        <td>{{ p.produto }}</td>
+        <td>{{ p.itens|numero }}</td>
+        <td>{{ p.venda|brl }}</td>
+        <td>{{ p.lucro|brl }}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="4" class="vazio">Sem dados.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+{% endblock %}

@@ -5,7 +5,8 @@ from apps.lojas.models import Loja
 
 from .models import Lancamento
 from .services import (
-    MECANICAS_INFO, bandeira_da_request, calcular_leve3, filtrar_por_bandeira,
+    MECANICAS_INFO, bandeira_da_request, calcular_cestoes, calcular_leve3,
+    filtrar_por_bandeira,
 )
 
 
@@ -55,3 +56,21 @@ def leve3(request):
         **dados,
     }
     return render(request, 'ofertas/leve3.html', contexto)
+
+
+def cestoes(request):
+    bandeira = bandeira_da_request(request)
+    busca = request.GET.get('busca', '').strip()
+
+    queryset = filtrar_por_bandeira(
+        Lancamento.objects.filter(mecanica=Lancamento.CESTOES), bandeira
+    )
+    dados = calcular_cestoes(queryset, busca=busca)
+
+    contexto = {
+        'secao': 'cestoes',
+        'bandeira_atual': bandeira,
+        'busca': busca,
+        **dados,
+    }
+    return render(request, 'ofertas/cestoes.html', contexto)

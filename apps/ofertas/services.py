@@ -111,6 +111,77 @@ def calcular_leve3(queryset, busca: str = ''):
     }
 
 
+def calcular_cestoes(queryset, busca: str = ''):
+    """Cestões (docx, seção 5.4 e 7.4): sem mecânica de verba por ora — só
+    performance (venda, unidades, margem), com o histórico completo desde
+    janeiro dos produtos hoje marcados em cestão."""
+    linhas = queryset.select_related('loja').values(
+        'loja_id', 'loja__codigo', 'loja__bandeira', 'produto_descricao',
+        'ano_mes', 'itens', 'venda', 'custo', 'lucro',
+    )
+
+    total_itens = ZERO
+    total_venda = ZERO
+    total_custo = ZERO
+    total_lucro = ZERO
+
+    por_mes = defaultdict(lambda: {'itens': ZERO, 'venda': ZERO, 'lucro': ZERO})
+    por_loja = defaultdict(lambda: {'codigo': '', 'bandeira': '', 'itens': ZERO, 'venda': ZERO, 'lucro': ZERO})
+    por_produto = defaultdict(lambda: {'itens': ZERO, 'venda': ZERO, 'custo': ZERO, 'lucro': ZERO})
+
+    for linha in linhas:
+        itens = linha['itens'] or ZERO
+        venda = linha['venda'] or ZERO
+        custo = linha['custo'] or ZERO
+        lucro = linha['lucro'] or ZERO
+
+        total_itens += itens
+        total_venda += venda
+        total_custo += custo
+        total_lucro += lucro
+
+        mes = por_mes[linha['ano_mes']]
+        mes['itens'] += itens
+        mes['venda'] += venda
+        mes['lucro'] += lucro
+
+        loja = por_loja[linha['loja_id']]
+        loja['codigo'] = linha['loja__codigo']
+        loja['bandeira'] = linha['loja__bandeira']
+        loja['itens'] += itens
+        loja['venda'] += venda
+        loja['lucro'] += lucro
+
+        produto = por_produto[linha['produto_descricao']]
+        produto['itens'] += itens
+        produto['venda'] += venda
+        produto['custo'] += custo
+        produto['lucro'] += lucro
+
+    produtos = [
+        {'produto': nome, **valores} for nome, valores in por_produto.items()
+        if not busca or busca.lower() in nome.lower()
+    ]
+    produtos.sort(key=lambda p: p['venda'], reverse=True)
+
+    margem_pct = (total_lucro / total_venda * 100) if total_venda else ZERO
+
+    return {
+        'kpis': {
+            'itens': total_itens,
+            'venda': total_venda,
+            'lucro': total_lucro,
+            'margem_pct': margem_pct,
+            'produtos': len(por_produto),
+        },
+        'por_mes': [
+            {'ano_mes': mes, **valores} for mes, valores in sorted(por_mes.items())
+        ],
+        'ranking_lojas': sorted(por_loja.values(), key=lambda l: l['venda'], reverse=True),
+        'produtos': produtos,
+    }
+
+
 MECANICAS_INFO = [
     (Lancamento.LEVE3, 'Leve 3 Pague 2'),
     (Lancamento.SUPRACORP, 'Degustação Supra Corp Day'),
