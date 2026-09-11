@@ -7,11 +7,14 @@
   <title>{% block title %}Painel de Ofertas{% endblock %} · Grupo Velanes</title>
   <style>
     :root {
-      --bg: #f6f7f9; --card: #ffffff; --border: #e3e6ea; --text: #1f2430;
-      --muted: #6b7280; --accent: #2f6feb; --accent-bg: #eaf1ff;
+      --bg: #0e1116; --card: #171b23; --border: #2b313c; --text: #e7e9ed;
+      --muted: #8b93a1; --accent: #5b8def; --accent-bg: #1e2a44;
+      --th-bg: #1c212b; --aviso-bg: #3a2f10; --aviso-border: #6b5518; --aviso-texto: #f0c86b;
       --sidebar-w: 230px;
     }
     * { box-sizing: border-box; }
+    a { color: var(--accent); }
+    a:visited { color: var(--accent); }
     body {
       margin: 0; background: var(--bg); color: var(--text);
       font: 15px/1.5 -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -38,7 +41,7 @@
       border-radius: 7px; font-size: 13.8px;
     }
     nav a:hover { background: var(--accent-bg); }
-    nav a.ativo { background: var(--accent); color: #fff; }
+    nav a.ativo { background: var(--accent); color: #0e1116; font-weight: 600; }
 
     .conteudo { flex: 1; min-width: 0; }
     .barra-topo {
@@ -50,7 +53,10 @@
       padding: 5px 8px; border-radius: 6px; border: 1px solid var(--border);
       font-size: 13.5px; text-transform: uppercase;
     }
-    input, select, button, option { text-transform: uppercase; }
+    input, select, button, option {
+      text-transform: uppercase; background: var(--card); color: var(--text);
+      border-color: var(--border); color-scheme: dark;
+    }
     main { padding: 24px; max-width: 1200px; }
     .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 24px; }
     .card {
@@ -68,13 +74,13 @@
 
     table { width: 100%; border-collapse: collapse; background: var(--card); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
     th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--border); font-size: 13.5px; }
-    th { background: #fafbfc; color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; user-select: none; }
+    th { background: var(--th-bg); color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; user-select: none; }
     table.tabela-interativa th::after { content: ''; display: inline-block; width: 10px; }
     table.tabela-interativa th.ordenado-asc::after { content: '▲'; font-size: 9px; margin-left: 4px; }
     table.tabela-interativa th.ordenado-desc::after { content: '▼'; font-size: 9px; margin-left: 4px; }
     tr:last-child td { border-bottom: none; }
     .aviso {
-      background: #fff8e6; border: 1px solid #f0d792; color: #7a5a00;
+      background: var(--aviso-bg); border: 1px solid var(--aviso-border); color: var(--aviso-texto);
       padding: 10px 14px; border-radius: 8px; font-size: 13.5px; margin-bottom: 18px;
     }
     .vazio { color: var(--muted); font-style: italic; }
@@ -89,7 +95,7 @@
       padding: 6px 12px; border-radius: 20px; font-size: 13px; text-decoration: none;
       background: var(--accent-bg); color: var(--text);
     }
-    .abas a.ativa { background: var(--accent); color: #fff; }
+    .abas a.ativa { background: var(--accent); color: #0e1116; font-weight: 600; }
 
     tr.linha-clicavel { cursor: pointer; }
     tr.linha-clicavel:hover { background: var(--accent-bg); }

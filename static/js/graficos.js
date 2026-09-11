@@ -1,7 +1,16 @@
 // Configuração comum dos gráficos Chart.js do painel — cada tela só monta
 // os `labels`/`datasets` e chama uma destas funções.
 (function () {
-  var PALETA = ['#2f6feb', '#e8763a', '#2fa876', '#c93f6f', '#9b6fe8'];
+  var PALETA = ['#5b8def', '#ef9f5b', '#4fc493', '#e8628f', '#b48cf0'];
+
+  // Tema escuro: Chart.js desenha em <canvas>, não herda o CSS da página —
+  // configura texto/linhas de grade claros globalmente, antes de qualquer
+  // gráfico ser criado.
+  if (window.Chart) {
+    Chart.defaults.color = '#8b93a1';
+    Chart.defaults.borderColor = 'rgba(255,255,255,0.08)';
+    Chart.defaults.scale.grid.color = 'rgba(255,255,255,0.08)';
+  }
 
   function corDaSerie(indice) {
     return PALETA[indice % PALETA.length];
@@ -60,7 +69,7 @@
         datasetExtra = {
           label: rotulo,
           data: seriesPorItem[nome],
-          borderColor: '#c93f6f', backgroundColor: '#c93f6f',
+          borderColor: '#e8628f', backgroundColor: '#e8628f',
           borderWidth: 3, tension: 0.25, pointRadius: 4,
         };
         chart.data.datasets.push(datasetExtra);
@@ -83,7 +92,7 @@
             data: s.data,
             backgroundColor: (destaqueIndices && series.length === 1)
               ? labels.map(function (_, idx) {
-                  return destaqueIndices.indexOf(idx) !== -1 ? '#e8763a' : '#2f6feb';
+                  return destaqueIndices.indexOf(idx) !== -1 ? '#ef9f5b' : '#5b8def';
                 })
               : corDaSerie(i),
           };
