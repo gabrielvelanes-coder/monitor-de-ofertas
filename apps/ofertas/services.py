@@ -344,6 +344,72 @@ def calcular_impacto_fabricante(queryset):
     }
 
 
+def calcular_marketing(queryset, busca: str = ''):
+    """Itens do Marketing (docx, seção 10 — tag "PRODUTOS MARKETING <mês>"):
+    ainda sem mecânica de verba mapeada, só performance."""
+    linhas = queryset.select_related('loja').values(
+        'loja_id', 'loja__codigo', 'loja__bandeira', 'produto_descricao',
+        'fabricante', 'ano_mes', 'itens', 'venda', 'custo', 'lucro',
+    )
+
+    total_itens = ZERO
+    total_venda = ZERO
+    total_lucro = ZERO
+
+    por_mes = defaultdict(lambda: {'itens': ZERO, 'venda': ZERO, 'lucro': ZERO})
+    por_fabricante = defaultdict(lambda: {'itens': ZERO, 'venda': ZERO, 'lucro': ZERO})
+    por_produto = defaultdict(lambda: {'itens': ZERO, 'venda': ZERO, 'custo': ZERO, 'lucro': ZERO})
+
+    for linha in linhas:
+        itens = linha['itens'] or ZERO
+        venda = linha['venda'] or ZERO
+        custo = linha['custo'] or ZERO
+        lucro = linha['lucro'] or ZERO
+
+        total_itens += itens
+        total_venda += venda
+        total_lucro += lucro
+
+        mes = por_mes[linha['ano_mes']]
+        mes['itens'] += itens
+        mes['venda'] += venda
+        mes['lucro'] += lucro
+
+        fabricante = por_fabricante[linha['fabricante'] or 'Não informado']
+        fabricante['itens'] += itens
+        fabricante['venda'] += venda
+        fabricante['lucro'] += lucro
+
+        produto = por_produto[linha['produto_descricao']]
+        produto['itens'] += itens
+        produto['venda'] += venda
+        produto['custo'] += custo
+        produto['lucro'] += lucro
+
+    produtos = [
+        {'produto': nome, **valores} for nome, valores in por_produto.items()
+        if not busca or busca.lower() in nome.lower()
+    ]
+    produtos.sort(key=lambda p: p['venda'], reverse=True)
+
+    return {
+        'kpis': {
+            'itens': total_itens,
+            'venda': total_venda,
+            'lucro': total_lucro,
+            'produtos': len(por_produto),
+        },
+        'por_mes': [
+            {'ano_mes': mes, **valores} for mes, valores in sorted(por_mes.items())
+        ],
+        'por_fabricante': sorted(
+            [{'fabricante': nome, **valores} for nome, valores in por_fabricante.items()],
+            key=lambda f: f['venda'], reverse=True,
+        ),
+        'produtos': produtos,
+    }
+
+
 MECANICAS_INFO = [
     (Lancamento.LEVE3, 'Leve 3 Pague 2'),
     (Lancamento.SUPRACORP, 'Degustação Supra Corp Day'),

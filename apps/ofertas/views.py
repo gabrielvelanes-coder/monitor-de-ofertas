@@ -7,8 +7,8 @@ from apps.lojas.models import Loja
 from .models import Lancamento
 from .services import (
     MECANICAS_INFO, bandeira_da_request, calcular_cestoes,
-    calcular_impacto_fabricante, calcular_leve3, calcular_supracorp,
-    filtrar_por_bandeira,
+    calcular_impacto_fabricante, calcular_leve3, calcular_marketing,
+    calcular_supracorp, filtrar_por_bandeira,
 )
 
 FABRICANTES = {
@@ -123,3 +123,21 @@ def impacto_fabricante(request, fabricante):
         **dados,
     }
     return render(request, 'ofertas/impacto_fabricante.html', contexto)
+
+
+def marketing(request):
+    bandeira = bandeira_da_request(request)
+    busca = request.GET.get('busca', '').strip()
+
+    queryset = filtrar_por_bandeira(
+        Lancamento.objects.filter(mecanica=Lancamento.MARKETING), bandeira
+    )
+    dados = calcular_marketing(queryset, busca=busca)
+
+    contexto = {
+        'secao': 'marketing',
+        'bandeira_atual': bandeira,
+        'busca': busca,
+        **dados,
+    }
+    return render(request, 'ofertas/marketing.html', contexto)

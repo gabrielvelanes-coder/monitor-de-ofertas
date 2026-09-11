@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% load ofertas_tags %}
+{% block title %}Itens do Marketing{% endblock %}
+{% block conteudo %}
+
+<h2>Itens do Marketing</h2>
+<p style="color:var(--muted); font-size:13.5px; margin-top:-8px;">
+  Tag "PRODUTOS MARKETING &lt;mês&gt;", vista em relatórios de diferentes fabricantes
+  (docx, seção 10) — mecânica ainda não individualmente mapeada, só performance.
+</p>
+
+{% if not kpis.itens %}
+  <div class="aviso">
+    Nenhum lançamento importado ainda. Copie o(s) relatório(s) com essa tag pra
+    <code>dados/entrada/</code> e rode <code>python manage.py importar_marketing</code>
+    (pode rodar mais de uma vez, com arquivos diferentes — é aditivo por arquivo).
+  </div>
+{% endif %}
+
+<div class="cards">
+  <div class="card"><div class="rotulo">Produtos</div><div class="valor">{{ kpis.produtos }}</div></div>
+  <div class="card"><div class="rotulo">Itens vendidos</div><div class="valor">{{ kpis.itens|numero }}</div></div>
+  <div class="card"><div class="rotulo">Venda</div><div class="valor">{{ kpis.venda|brl }}</div></div>
+  <div class="card"><div class="rotulo">Lucro</div><div class="valor">{{ kpis.lucro|brl }}</div></div>
+</div>
+
+<h3>Venda por mês</h3>
+<table>
+  <thead>
+    <tr><th>Mês</th><th>Itens</th><th>Venda</th><th>Lucro</th></tr>
+  </thead>
+  <tbody>
+    {% for m in por_mes %}
+      <tr>
+        <td>{{ m.ano_mes }}</td>
+        <td>{{ m.itens|numero }}</td>
+        <td>{{ m.venda|brl }}</td>
+        <td>{{ m.lucro|brl }}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="4" class="vazio">Sem dados.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<h3 style="margin-top:24px;">Venda por fabricante</h3>
+<table>
+  <thead>
+    <tr><th>Fabricante</th><th>Itens</th><th>Venda</th><th>Lucro</th></tr>
+  </thead>
+  <tbody>
+    {% for f in por_fabricante %}
+      <tr>
+        <td>{{ f.fabricante }}</td>
+        <td>{{ f.itens|numero }}</td>
+        <td>{{ f.venda|brl }}</td>
+        <td>{{ f.lucro|brl }}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="4" class="vazio">Sem dados.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<h3 style="margin-top:24px;">Produtos</h3>
+<form method="get" style="margin-bottom:10px;">
+  {% if bandeira_atual %}<input type="hidden" name="bandeira" value="{{ bandeira_atual }}">{% endif %}
+  <input type="text" name="busca" value="{{ busca }}" placeholder="Buscar produto…"
+         style="padding:6px 10px; border-radius:6px; border:1px solid var(--border); width:280px;">
+  <button type="submit" style="padding:6px 12px; border-radius:6px; border:1px solid var(--border); background:#fff; cursor:pointer;">Buscar</button>
+</form>
+<table>
+  <thead>
+    <tr><th>Produto</th><th>Itens</th><th>Venda</th><th>Lucro</th></tr>
+  </thead>
+  <tbody>
+    {% for p in produtos %}
+      <tr>
+        <td>{{ p.produto }}</td>
+        <td>{{ p.itens|numero }}</td>
+        <td>{{ p.venda|brl }}</td>
+        <td>{{ p.lucro|brl }}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="4" class="vazio">Sem dados.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+{% endblock %}
