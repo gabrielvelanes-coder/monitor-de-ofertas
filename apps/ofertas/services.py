@@ -7,7 +7,12 @@ o filtro de bandeira em qualquer combinação (ver docx, seção 9).
 """
 from __future__ import annotations
 
+from collections import defaultdict
+from decimal import Decimal
+
 from .models import Lancamento
+
+ZERO = Decimal('0')
 
 
 def bandeira_da_request(request) -> str:
@@ -23,6 +28,87 @@ def filtrar_por_bandeira(queryset, bandeira: str):
     if bandeira:
         return queryset.filter(loja__bandeira=bandeira)
     return queryset
+
+
+def calcular_leve3(queryset, busca: str = ''):
+    """Leve 3 Pague 2 (docx, seção 5.1 e 6):
+    ciclos = INT(itens / 3); investimento = ciclos × (custo da linha / itens
+    da linha); margem ajustada = margem contábil (lucro) + investimento.
+    Tudo calculado linha a linha, antes de somar.
+    """
+    linhas = queryset.select_related('loja').values(
+        'loja_id', 'loja__codigo', 'loja__bandeira', 'produto_descricao',
+        'ano_mes', 'itens', 'venda', 'custo', 'lucro',
+    )
+
+    total_itens = ZERO
+    total_ciclos = ZERO
+    total_investimento = ZERO
+    total_venda = ZERO
+    total_margem_contabil = ZERO
+
+    por_mes = defaultdict(lambda: {'investimento': ZERO, 'margem_contabil': ZERO, 'margem_ajustada': ZERO})
+    por_loja = defaultdict(lambda: {'codigo': '', 'bandeira': '', 'margem_contabil': ZERO, 'margem_ajustada': ZERO, 'investimento': ZERO})
+    por_produto = defaultdict(lambda: {'itens': ZERO, 'ciclos': ZERO, 'investimento': ZERO, 'venda': ZERO, 'custo': ZERO, 'lucro': ZERO})
+
+    for linha in linhas:
+        itens = linha['itens'] or ZERO
+        custo = linha['custo'] or ZERO
+        lucro = linha['lucro'] or ZERO
+        venda = linha['venda'] or ZERO
+
+        ciclos = itens // 3
+        custo_unitario = (custo / itens) if itens else ZERO
+        investimento = ciclos * custo_unitario
+        margem_ajustada = lucro + investimento
+
+        total_itens += itens
+        total_ciclos += ciclos
+        total_investimento += investimento
+        total_venda += venda
+        total_margem_contabil += lucro
+
+        mes = por_mes[linha['ano_mes']]
+        mes['investimento'] += investimento
+        mes['margem_contabil'] += lucro
+        mes['margem_ajustada'] += margem_ajustada
+
+        loja = por_loja[linha['loja_id']]
+        loja['codigo'] = linha['loja__codigo']
+        loja['bandeira'] = linha['loja__bandeira']
+        loja['margem_contabil'] += lucro
+        loja['margem_ajustada'] += margem_ajustada
+        loja['investimento'] += investimento
+
+        produto = por_produto[linha['produto_descricao']]
+        produto['itens'] += itens
+        produto['ciclos'] += ciclos
+        produto['investimento'] += investimento
+        produto['venda'] += venda
+        produto['custo'] += custo
+        produto['lucro'] += lucro
+
+    produtos = [
+        {'produto': nome, **valores} for nome, valores in por_produto.items()
+        if not busca or busca.lower() in nome.lower()
+    ]
+    produtos.sort(key=lambda p: p['venda'], reverse=True)
+
+    return {
+        'kpis': {
+            'itens': total_itens,
+            'ciclos': total_ciclos,
+            'investimento': total_investimento,
+            'venda': total_venda,
+            'margem_contabil': total_margem_contabil,
+            'margem_ajustada': total_margem_contabil + total_investimento,
+        },
+        'por_mes': [
+            {'ano_mes': mes, **valores} for mes, valores in sorted(por_mes.items())
+        ],
+        'ranking_lojas': sorted(por_loja.values(), key=lambda l: l['investimento'], reverse=True),
+        'produtos': produtos,
+    }
 
 
 MECANICAS_INFO = [

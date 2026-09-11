@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% load ofertas_tags %}
+{% block title %}Leve 3 Pague 2{% endblock %}
+{% block conteudo %}
+
+<h2>Leve 3 Pague 2 <small style="color:var(--muted); font-weight:400;">— genéricos</small></h2>
+
+{% if not kpis.itens %}
+  <div class="aviso">
+    Nenhum lançamento importado ainda. Copie <code>LEVE 3 PAGUE 2.xls</code> pra
+    <code>dados/entrada/</code> e rode <code>python manage.py importar_leve3</code>.
+  </div>
+{% endif %}
+
+<div class="cards">
+  <div class="card"><div class="rotulo">Itens vendidos</div><div class="valor">{{ kpis.itens|numero }}</div></div>
+  <div class="card"><div class="rotulo">Ciclos</div><div class="valor">{{ kpis.ciclos|numero }}</div></div>
+  <div class="card"><div class="rotulo">Investimento a reembolsar</div><div class="valor">{{ kpis.investimento|brl }}</div></div>
+  <div class="card"><div class="rotulo">Margem contábil</div><div class="valor">{{ kpis.margem_contabil|brl }}</div></div>
+  <div class="card"><div class="rotulo">Margem ajustada</div><div class="valor">{{ kpis.margem_ajustada|brl }}</div></div>
+</div>
+
+<h3>Investimento e margem por mês</h3>
+<table>
+  <thead>
+    <tr><th>Mês</th><th>Investimento</th><th>Margem contábil</th><th>Margem ajustada</th></tr>
+  </thead>
+  <tbody>
+    {% for m in por_mes %}
+      <tr>
+        <td>{{ m.ano_mes }}</td>
+        <td>{{ m.investimento|brl }}</td>
+        <td>{{ m.margem_contabil|brl }}</td>
+        <td>{{ m.margem_ajustada|brl }}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="4" class="vazio">Sem dados.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<h3 style="margin-top:24px;">Ranking de lojas (por investimento)</h3>
+<table>
+  <thead>
+    <tr><th>Loja</th><th>Bandeira</th><th>Investimento</th><th>Margem contábil</th><th>Margem ajustada</th></tr>
+  </thead>
+  <tbody>
+    {% for l in ranking_lojas %}
+      <tr>
+        <td>{{ l.codigo }}</td>
+        <td>{{ l.bandeira }}</td>
+        <td>{{ l.investimento|brl }}</td>
+        <td>{{ l.margem_contabil|brl }}</td>
+        <td>{{ l.margem_ajustada|brl }}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="5" class="vazio">Sem dados.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<h3 style="margin-top:24px;">Produtos participantes</h3>
+<form method="get" style="margin-bottom:10px;">
+  {% if bandeira_atual %}<input type="hidden" name="bandeira" value="{{ bandeira_atual }}">{% endif %}
+  <input type="text" name="busca" value="{{ busca }}" placeholder="Buscar produto…"
+         style="padding:6px 10px; border-radius:6px; border:1px solid var(--border); width:280px;">
+  <button type="submit" style="padding:6px 12px; border-radius:6px; border:1px solid var(--border); background:#fff; cursor:pointer;">Buscar</button>
+</form>
+<table>
+  <thead>
+    <tr><th>Produto</th><th>Itens</th><th>Ciclos</th><th>Investimento</th><th>Venda</th><th>Lucro</th></tr>
+  </thead>
+  <tbody>
+    {% for p in produtos %}
+      <tr>
+        <td>{{ p.produto }}</td>
+        <td>{{ p.itens|numero }}</td>
+        <td>{{ p.ciclos|numero }}</td>
+        <td>{{ p.investimento|brl }}</td>
+        <td>{{ p.venda|brl }}</td>
+        <td>{{ p.lucro|brl }}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="6" class="vazio">Sem dados.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+{% endblock %}

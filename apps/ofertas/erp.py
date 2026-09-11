@@ -94,3 +94,35 @@ def coluna(df, *candidatos) -> str | None:
 
 def ano_mes_de(d: date) -> str:
     return f'{d.year:04d}-{d.month:02d}'
+
+
+def remover_linha_total(df, col_codigo_loja: str):
+    """Esses relatórios terminam com uma linha 'Total' (soma geral) na
+    coluna do código da loja — remove antes de importar."""
+    return df[
+        df[col_codigo_loja].notna()
+        & (df[col_codigo_loja].astype(str).str.strip().str.lower() != 'total')
+    ]
+
+
+def codigo_loja(valor) -> str:
+    """Normaliza o código da loja pro mesmo formato do cadastro
+    (`importar_lojas`): sem zero à esquerda. Os relatórios de venda trazem
+    '02', '06'... o cadastro de lojas traz '2', '6'... (sem padding)."""
+    texto = str(valor).strip()
+    try:
+        return str(int(float(texto)))
+    except (TypeError, ValueError):
+        return texto
+
+
+def codigo_barras(valor) -> str:
+    """Códigos de barra vêm como float (notação científica) quando a
+    coluna tem NaN em algumas linhas — normaliza pra string de dígitos."""
+    if valor is None or (isinstance(valor, float) and pd.isna(valor)):
+        return ''
+    texto = str(valor).strip()
+    try:
+        return str(int(float(texto)))
+    except (TypeError, ValueError):
+        return texto

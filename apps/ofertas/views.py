@@ -4,7 +4,9 @@ from django.shortcuts import render
 from apps.lojas.models import Loja
 
 from .models import Lancamento
-from .services import MECANICAS_INFO, bandeira_da_request, filtrar_por_bandeira
+from .services import (
+    MECANICAS_INFO, bandeira_da_request, calcular_leve3, filtrar_por_bandeira,
+)
 
 
 def home(request):
@@ -35,3 +37,21 @@ def home(request):
         'mecanicas': mecanicas,
     }
     return render(request, 'ofertas/home.html', contexto)
+
+
+def leve3(request):
+    bandeira = bandeira_da_request(request)
+    busca = request.GET.get('busca', '').strip()
+
+    queryset = filtrar_por_bandeira(
+        Lancamento.objects.filter(mecanica=Lancamento.LEVE3), bandeira
+    )
+    dados = calcular_leve3(queryset, busca=busca)
+
+    contexto = {
+        'secao': 'leve3',
+        'bandeira_atual': bandeira,
+        'busca': busca,
+        **dados,
+    }
+    return render(request, 'ofertas/leve3.html', contexto)
