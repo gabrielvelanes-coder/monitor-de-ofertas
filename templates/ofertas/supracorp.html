@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% load ofertas_tags %}
+{% block title %}Supra Corp Day{% endblock %}
+{% block conteudo %}
+
+<h2>Degustação Supra Corp Day <small style="color:var(--muted); font-weight:400;">— evento de {{ evento_data|date:"d/m/Y" }}</small></h2>
+
+{% if not kpis.itens_evento %}
+  <div class="aviso">
+    Nenhum lançamento importado ainda. Copie <code>supracorp day.xls</code> pra
+    <code>dados/entrada/</code> e rode <code>python manage.py importar_supracorp</code>.
+  </div>
+{% endif %}
+
+<div class="cards">
+  <div class="card"><div class="rotulo">Itens no evento</div><div class="valor">{{ kpis.itens_evento|numero }}</div></div>
+  <div class="card"><div class="rotulo">Venda no evento</div><div class="valor">{{ kpis.venda_evento|brl }}</div></div>
+  <div class="card"><div class="rotulo">Média diária (resto do mês)</div><div class="valor">{{ kpis.media_diaria_geral|numero:1 }}</div></div>
+  <div class="card"><div class="rotulo">Impacto</div><div class="valor">{% if kpis.impacto_geral %}{{ kpis.impacto_geral|numero:2 }}×{% else %}—{% endif %}</div></div>
+</div>
+
+<h3>Vendas diárias de agosto <small style="color:var(--muted); font-weight:400;">— janela do evento destacada</small></h3>
+<table>
+  <thead>
+    <tr><th>Dia</th><th>Itens</th><th>Venda</th></tr>
+  </thead>
+  <tbody>
+    {% for d in serie_diaria %}
+      <tr {% if d.na_janela %}style="background:var(--accent-bg);"{% endif %}>
+        <td>{{ d.data|date:"d/m" }}{% if d.na_janela %} <strong>· evento</strong>{% endif %}</td>
+        <td>{{ d.itens|numero }}</td>
+        <td>{{ d.venda|brl }}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="3" class="vazio">Sem dados.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<h3 style="margin-top:24px;">Impacto por loja</h3>
+<table>
+  <thead>
+    <tr><th>Loja</th><th>Bandeira</th><th>Itens no evento</th><th>Média diária (resto)</th><th>Impacto</th></tr>
+  </thead>
+  <tbody>
+    {% for l in ranking_lojas %}
+      <tr>
+        <td>{{ l.codigo }}</td>
+        <td>{{ l.bandeira }}</td>
+        <td>{{ l.itens_evento|numero }}</td>
+        <td>{{ l.media_diaria|numero:2 }}</td>
+        <td>{% if l.impacto %}{{ l.impacto|numero:2 }}×{% else %}—{% endif %}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="5" class="vazio">Sem dados.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<h3 style="margin-top:24px;">Itens por produto no evento</h3>
+<table>
+  <thead>
+    <tr><th>Produto</th><th>Itens</th><th>Venda</th></tr>
+  </thead>
+  <tbody>
+    {% for p in produtos %}
+      <tr>
+        <td>{{ p.produto }}</td>
+        <td>{{ p.itens_evento|numero }}</td>
+        <td>{{ p.venda_evento|brl }}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="3" class="vazio">Sem dados.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+{% endblock %}

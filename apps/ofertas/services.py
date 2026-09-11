@@ -7,12 +7,20 @@ o filtro de bandeira em qualquer combinação (ver docx, seção 9).
 """
 from __future__ import annotations
 
+import calendar
 from collections import defaultdict
+from datetime import date, timedelta
 from decimal import Decimal
 
 from .models import Lancamento
 
 ZERO = Decimal('0')
+
+# Evento pontual de degustação Supra Corp Day (docx, seção 5.2) — data fixa,
+# não um padrão recorrente. Se um novo evento acontecer, este valor (e o
+# import) precisam ser atualizados/generalizados.
+EVENTO_SUPRACORP = date(2026, 8, 5)
+JANELA_SUPRACORP = {EVENTO_SUPRACORP, EVENTO_SUPRACORP + timedelta(days=1)}
 
 
 def bandeira_da_request(request) -> str:
@@ -179,6 +187,88 @@ def calcular_cestoes(queryset, busca: str = ''):
         ],
         'ranking_lojas': sorted(por_loja.values(), key=lambda l: l['venda'], reverse=True),
         'produtos': produtos,
+    }
+
+
+def calcular_supracorp(queryset):
+    """Degustação Supra Corp Day (docx, seção 5.2): impacto = itens vendidos
+    na janela do evento (dia do evento + o dia seguinte) ÷ média diária de
+    vendas no resto do mês — geral, por loja e por produto."""
+    linhas = list(queryset.select_related('loja').values(
+        'loja_id', 'loja__codigo', 'loja__bandeira', 'produto_descricao',
+        'data', 'itens', 'venda',
+    ))
+
+    dias_no_mes = calendar.monthrange(EVENTO_SUPRACORP.year, EVENTO_SUPRACORP.month)[1]
+    dias_resto = dias_no_mes - len(JANELA_SUPRACORP)
+
+    por_dia = defaultdict(lambda: {'itens': ZERO, 'venda': ZERO})
+    por_loja = defaultdict(lambda: {
+        'codigo': '', 'bandeira': '',
+        'itens_evento': ZERO, 'itens_resto': ZERO,
+    })
+    por_produto = defaultdict(lambda: {'itens_evento': ZERO, 'venda_evento': ZERO})
+
+    total_itens_evento = ZERO
+    total_venda_evento = ZERO
+    total_itens_resto = ZERO
+
+    for linha in linhas:
+        data = linha['data']
+        if data is None:
+            continue
+        itens = linha['itens'] or ZERO
+        venda = linha['venda'] or ZERO
+        na_janela = data in JANELA_SUPRACORP
+
+        dia = por_dia[data]
+        dia['itens'] += itens
+        dia['venda'] += venda
+
+        loja = por_loja[linha['loja_id']]
+        loja['codigo'] = linha['loja__codigo']
+        loja['bandeira'] = linha['loja__bandeira']
+
+        if na_janela:
+            total_itens_evento += itens
+            total_venda_evento += venda
+            loja['itens_evento'] += itens
+            produto = por_produto[linha['produto_descricao']]
+            produto['itens_evento'] += itens
+            produto['venda_evento'] += venda
+        else:
+            total_itens_resto += itens
+            loja['itens_resto'] += itens
+
+    media_diaria_geral = (total_itens_resto / dias_resto) if dias_resto else ZERO
+    impacto_geral = (total_itens_evento / media_diaria_geral) if media_diaria_geral else None
+
+    ranking_lojas = []
+    for loja in por_loja.values():
+        media = (loja['itens_resto'] / dias_resto) if dias_resto else ZERO
+        impacto = (loja['itens_evento'] / media) if media else None
+        ranking_lojas.append({**loja, 'media_diaria': media, 'impacto': impacto})
+    ranking_lojas.sort(key=lambda l: l['itens_evento'], reverse=True)
+
+    produtos = sorted(por_produto.items(), key=lambda kv: kv[1]['venda_evento'], reverse=True)
+    produtos = [{'produto': nome, **valores} for nome, valores in produtos]
+
+    serie_diaria = [
+        {'data': dia, 'na_janela': dia in JANELA_SUPRACORP, **valores}
+        for dia, valores in sorted(por_dia.items())
+    ]
+
+    return {
+        'kpis': {
+            'itens_evento': total_itens_evento,
+            'venda_evento': total_venda_evento,
+            'media_diaria_geral': media_diaria_geral,
+            'impacto_geral': impacto_geral,
+        },
+        'serie_diaria': serie_diaria,
+        'ranking_lojas': ranking_lojas,
+        'produtos': produtos,
+        'evento_data': EVENTO_SUPRACORP,
     }
 
 

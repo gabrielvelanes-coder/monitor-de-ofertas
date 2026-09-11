@@ -6,7 +6,7 @@ from apps.lojas.models import Loja
 from .models import Lancamento
 from .services import (
     MECANICAS_INFO, bandeira_da_request, calcular_cestoes, calcular_leve3,
-    filtrar_por_bandeira,
+    calcular_supracorp, filtrar_por_bandeira,
 )
 
 
@@ -74,3 +74,19 @@ def cestoes(request):
         **dados,
     }
     return render(request, 'ofertas/cestoes.html', contexto)
+
+
+def supracorp(request):
+    bandeira = bandeira_da_request(request)
+
+    queryset = filtrar_por_bandeira(
+        Lancamento.objects.filter(mecanica=Lancamento.SUPRACORP), bandeira
+    )
+    dados = calcular_supracorp(queryset)
+
+    contexto = {
+        'secao': 'supracorp',
+        'bandeira_atual': bandeira,
+        **dados,
+    }
+    return render(request, 'ofertas/supracorp.html', contexto)
