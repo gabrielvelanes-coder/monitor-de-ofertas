@@ -272,6 +272,78 @@ def calcular_supracorp(queryset):
     }
 
 
+def calcular_impacto_fabricante(queryset):
+    """Impacto por fabricante — Kenvue/Principia/Botica/Procter (docx,
+    seção 5.3): compara volume/venda/margem "sem desconto" (base) com a
+    promoção do fabricante, mês a mês e por loja."""
+    linhas = queryset.select_related('loja').values(
+        'loja_id', 'loja__codigo', 'loja__bandeira', 'grupo', 'ano_mes',
+        'itens', 'venda', 'custo', 'lucro',
+    )
+
+    por_mes = defaultdict(lambda: {
+        'itens_base': ZERO, 'venda_base': ZERO,
+        'itens_oferta': ZERO, 'venda_oferta': ZERO,
+    })
+    por_loja = defaultdict(lambda: {
+        'codigo': '', 'bandeira': '',
+        'itens_oferta': ZERO, 'venda_oferta': ZERO, 'lucro_oferta': ZERO,
+    })
+
+    totais = {g: {'itens': ZERO, 'venda': ZERO, 'custo': ZERO, 'lucro': ZERO}
+              for g in (Lancamento.GRUPO_BASE, Lancamento.GRUPO_OFERTA)}
+
+    for linha in linhas:
+        grupo = linha['grupo']
+        if grupo not in totais:
+            continue
+        itens = linha['itens'] or ZERO
+        venda = linha['venda'] or ZERO
+        custo = linha['custo'] or ZERO
+        lucro = linha['lucro'] or ZERO
+
+        totais[grupo]['itens'] += itens
+        totais[grupo]['venda'] += venda
+        totais[grupo]['custo'] += custo
+        totais[grupo]['lucro'] += lucro
+
+        mes = por_mes[linha['ano_mes']]
+        mes[f'itens_{grupo}'] += itens
+        mes[f'venda_{grupo}'] += venda
+
+        if grupo == Lancamento.GRUPO_OFERTA:
+            loja = por_loja[linha['loja_id']]
+            loja['codigo'] = linha['loja__codigo']
+            loja['bandeira'] = linha['loja__bandeira']
+            loja['itens_oferta'] += itens
+            loja['venda_oferta'] += venda
+            loja['lucro_oferta'] += lucro
+
+    def _margem_pct(g):
+        venda = totais[g]['venda']
+        return (totais[g]['lucro'] / venda * 100) if venda else ZERO
+
+    kpis = {
+        'itens_base': totais[Lancamento.GRUPO_BASE]['itens'],
+        'venda_base': totais[Lancamento.GRUPO_BASE]['venda'],
+        'margem_base_pct': _margem_pct(Lancamento.GRUPO_BASE),
+        'itens_oferta': totais[Lancamento.GRUPO_OFERTA]['itens'],
+        'venda_oferta': totais[Lancamento.GRUPO_OFERTA]['venda'],
+        'lucro_oferta': totais[Lancamento.GRUPO_OFERTA]['lucro'],
+        'margem_oferta_pct': _margem_pct(Lancamento.GRUPO_OFERTA),
+    }
+
+    return {
+        'kpis': kpis,
+        'por_mes': [
+            {'ano_mes': mes, **valores} for mes, valores in sorted(por_mes.items())
+        ],
+        'ranking_lojas': sorted(
+            por_loja.values(), key=lambda l: l['venda_oferta'], reverse=True
+        ),
+    }
+
+
 MECANICAS_INFO = [
     (Lancamento.LEVE3, 'Leve 3 Pague 2'),
     (Lancamento.SUPRACORP, 'Degustação Supra Corp Day'),

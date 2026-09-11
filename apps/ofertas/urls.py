@@ -9,4 +9,5 @@ urlpatterns = [
     path('leve3/', views.leve3, name='leve3'),
     path('cestoes/', views.cestoes, name='cestoes'),
     path('supracorp/', views.supracorp, name='supracorp'),
+    path('fabricante/<str:fabricante>/', views.impacto_fabricante, name='impacto_fabricante'),
 ]

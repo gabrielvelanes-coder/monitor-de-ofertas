@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% load ofertas_tags %}
+{% block title %}{{ fabricante_rotulo }}{% endblock %}
+{% block conteudo %}
+
+<h2>Impacto por fabricante <small style="color:var(--muted); font-weight:400;">— {{ fabricante_rotulo }}</small></h2>
+<p style="color:var(--muted); font-size:13.5px; margin-top:-8px;">
+  Mecânica de verba pendente de definição (docx, seção 5.3) — esta tela mostra só volume/venda/margem.
+</p>
+
+{% if not kpis.venda_oferta and not kpis.venda_base %}
+  <div class="aviso">
+    Nenhum lançamento importado ainda. Copie <code>baseline {{ fabricante_chave }} 2026.xls</code>
+    pra <code>dados/entrada/</code> e rode <code>python manage.py importar_{{ fabricante_chave }}</code>.
+  </div>
+{% endif %}
+
+<div class="cards">
+  <div class="card"><div class="rotulo">Venda base (sem desconto)</div><div class="valor">{{ kpis.venda_base|brl }}</div></div>
+  <div class="card"><div class="rotulo">Margem base</div><div class="valor">{{ kpis.margem_base_pct|numero:1 }}%</div></div>
+  <div class="card"><div class="rotulo">Venda na oferta</div><div class="valor">{{ kpis.venda_oferta|brl }}</div></div>
+  <div class="card"><div class="rotulo">Margem na oferta</div><div class="valor">{{ kpis.margem_oferta_pct|numero:1 }}%</div></div>
+</div>
+
+<h3>Venda por mês — base vs. oferta</h3>
+<table>
+  <thead>
+    <tr><th>Mês</th><th>Itens base</th><th>Venda base</th><th>Itens oferta</th><th>Venda oferta</th></tr>
+  </thead>
+  <tbody>
+    {% for m in por_mes %}
+      <tr>
+        <td>{{ m.ano_mes }}</td>
+        <td>{{ m.itens_base|numero }}</td>
+        <td>{{ m.venda_base|brl }}</td>
+        <td>{{ m.itens_oferta|numero }}</td>
+        <td>{{ m.venda_oferta|brl }}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="5" class="vazio">Sem dados.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<h3 style="margin-top:24px;">Lojas com maior venda na promoção</h3>
+<table>
+  <thead>
+    <tr><th>Loja</th><th>Bandeira</th><th>Itens</th><th>Venda</th><th>Lucro</th></tr>
+  </thead>
+  <tbody>
+    {% for l in ranking_lojas %}
+      <tr>
+        <td>{{ l.codigo }}</td>
+        <td>{{ l.bandeira }}</td>
+        <td>{{ l.itens_oferta|numero }}</td>
+        <td>{{ l.venda_oferta|brl }}</td>
+        <td>{{ l.lucro_oferta|brl }}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="5" class="vazio">Sem dados.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+{% endblock %}

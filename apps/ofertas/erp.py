@@ -116,6 +116,14 @@ def codigo_loja(valor) -> str:
         return texto
 
 
+def tag_sem_prefixo(texto) -> str:
+    """'Cad. Oferta: PROMOÇÃO KENVUE' -> 'PROMOÇÃO KENVUE' — tira o prefixo
+    "Cad. Oferta:"/"Manual:" pra comparar só o nome da tag."""
+    texto = str(texto or '').strip()
+    texto = re.sub(r'^(cad\.?\s*oferta|manual)\s*:?\s*', '', texto, flags=re.IGNORECASE)
+    return re.sub(r'\s+', ' ', texto).strip()
+
+
 def codigo_barras(valor) -> str:
     """Códigos de barra vêm como float (notação científica) quando a
     coluna tem NaN em algumas linhas — normaliza pra string de dígitos."""

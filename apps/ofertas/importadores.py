@@ -1,0 +1,92 @@
+"""Lógica de importação compartilhada pelas 4 mecânicas de "impacto por
+fabricante" (Kenvue, Principia, Botica, Procter — docx seção 5.3): cada
+arquivo baseline_<fabricante>_2026.xls traz linhas "Sem Desconto" (base) e
+linhas com a tag de promoção específica do fabricante, misturadas com
+outras tags (outras campanhas do próprio fabricante, "Manual: ...", etc.)
+que não entram na comparação — só base e a tag-alvo exata.
+"""
+from __future__ import annotations
+
+from django.db import transaction
+
+from apps.lojas.models import Loja
+
+from .erp import (
+    codigo_loja, coluna, ler_relatorio_erp, remover_linha_total,
+    tag_sem_prefixo,
+)
+from .models import Lancamento
+
+
+def importar_relatorio_fabricante(caminho, mecanica: str, tag_alvo: str, fabricante: str) -> dict:
+    df, _, _ = ler_relatorio_erp(caminho)
+
+    col_loja = coluna(df, 'Cód. Un. Neg.')
+    col_ano_mes = coluna(df, 'Ano-mês')
+    col_produto = coluna(df, 'Embalagem')
+    col_tag = coluna(df, 'Detalhe Desconto', 'Cad. Oferta')
+    col_itens = coluna(df, 'Itens')
+    col_venda = coluna(df, 'Venda')
+    col_desconto = coluna(df, 'Desconto')
+    col_custo = coluna(df, 'Custo')
+    col_lucro = coluna(df, 'Lucro')
+    faltando = [
+        nome for nome, col in {
+            'loja': col_loja, 'ano_mes': col_ano_mes, 'produto': col_produto,
+            'tag': col_tag, 'itens': col_itens, 'venda': col_venda,
+            'custo': col_custo, 'lucro': col_lucro,
+        }.items() if col is None
+    ]
+    if faltando:
+        raise ValueError(f'Colunas não encontradas no arquivo: {", ".join(faltando)}.')
+
+    df = remover_linha_total(df, col_ano_mes)
+
+    lojas = {loja.codigo: loja for loja in Loja.objects.all()}
+    lancamentos = []
+    lojas_sem_cadastro = set()
+    ignoradas = 0
+
+    for _, linha in df.iterrows():
+        tag_bruta = str(linha.get(col_tag, '') or '').strip()
+        tag_limpa = tag_sem_prefixo(tag_bruta)
+        if tag_limpa.lower() == 'sem desconto':
+            grupo = Lancamento.GRUPO_BASE
+        elif tag_limpa.upper() == tag_alvo.upper():
+            grupo = Lancamento.GRUPO_OFERTA
+        else:
+            ignoradas += 1
+            continue
+
+        codigo = codigo_loja(linha[col_loja])
+        loja = lojas.get(codigo)
+        if loja is None:
+            lojas_sem_cadastro.add(codigo)
+            continue
+
+        lancamentos.append(Lancamento(
+            mecanica=mecanica,
+            loja=loja,
+            produto_descricao=str(linha[col_produto]).strip(),
+            fabricante=fabricante,
+            tag_origem=tag_bruta,
+            grupo=grupo,
+            ano_mes=str(linha[col_ano_mes]).strip(),
+            itens=linha[col_itens],
+            venda=linha[col_venda],
+            desconto=linha.get(col_desconto) or 0,
+            custo=linha[col_custo],
+            lucro=linha[col_lucro],
+            arquivo_origem=caminho.name,
+        ))
+
+    with transaction.atomic():
+        apagados, _ = Lancamento.objects.filter(mecanica=mecanica).delete()
+        Lancamento.objects.bulk_create(lancamentos, batch_size=1000)
+
+    return {
+        'importados': len(lancamentos),
+        'apagados': apagados,
+        'ignoradas': ignoradas,
+        'lojas_sem_cadastro': lojas_sem_cadastro,
+    }
