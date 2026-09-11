@@ -113,7 +113,7 @@
   var dados = JSON.parse(document.getElementById('dados-grafico-leve3').textContent);
   var chart = graficoLinha('grafico-leve3', dados.labels, dados.series);
   var seriesProdutos = JSON.parse(document.getElementById('dados-series-produtos-leve3').textContent);
-  var destacarProduto = iniciarDrillDown(chart, seriesProdutos, 'Investimento');
+  var destacarProduto = iniciarDrillDown(chart, seriesProdutos, 'Venda');
   document.querySelectorAll('#tabela-produtos .linha-clicavel').forEach(function (tr) {
     tr.addEventListener('click', function () { destacarProduto(tr.dataset.produto); });
   });

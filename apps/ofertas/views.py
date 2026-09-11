@@ -129,11 +129,7 @@ def leve3(request):
         queryset = queryset.filter(fabricante=fabricante)
 
     dados = calcular_leve3(queryset, busca=busca)
-    grafico = grafico_mensal(dados['por_mes'], [
-        ('investimento', 'Investimento'),
-        ('margem_contabil', 'Margem contábil'),
-        ('margem_ajustada', 'Margem ajustada'),
-    ])
+    grafico = grafico_mensal(dados['por_mes'], [('venda', 'Venda')])
 
     contexto = {
         'secao': 'leve3',

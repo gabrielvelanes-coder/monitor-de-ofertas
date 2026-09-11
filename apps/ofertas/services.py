@@ -113,7 +113,7 @@ def calcular_leve3(queryset, busca: str = ''):
     total_venda = ZERO
     total_margem_contabil = ZERO
 
-    por_mes = defaultdict(lambda: {'investimento': ZERO, 'margem_contabil': ZERO, 'margem_ajustada': ZERO})
+    por_mes = defaultdict(lambda: {'itens': ZERO, 'venda': ZERO, 'investimento': ZERO, 'margem_contabil': ZERO, 'margem_ajustada': ZERO})
     por_loja = defaultdict(lambda: {'codigo': '', 'bandeira': '', 'margem_contabil': ZERO, 'margem_ajustada': ZERO, 'investimento': ZERO})
     por_produto = defaultdict(lambda: {'itens': ZERO, 'ciclos': ZERO, 'investimento': ZERO, 'venda': ZERO, 'custo': ZERO, 'lucro': ZERO})
     por_produto_mes = defaultdict(lambda: defaultdict(lambda: ZERO))
@@ -136,6 +136,8 @@ def calcular_leve3(queryset, busca: str = ''):
         total_margem_contabil += lucro
 
         mes = por_mes[linha['ano_mes']]
+        mes['itens'] += itens
+        mes['venda'] += venda
         mes['investimento'] += investimento
         mes['margem_contabil'] += lucro
         mes['margem_ajustada'] += margem_ajustada
@@ -154,7 +156,7 @@ def calcular_leve3(queryset, busca: str = ''):
         produto['venda'] += venda
         produto['custo'] += custo
         produto['lucro'] += lucro
-        por_produto_mes[linha['produto_descricao']][linha['ano_mes']] += investimento
+        por_produto_mes[linha['produto_descricao']][linha['ano_mes']] += venda
 
     produtos = [
         {'produto': nome, **valores} for nome, valores in por_produto.items()
