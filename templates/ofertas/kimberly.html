@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% load ofertas_tags %}
+{% block title %}Kimberly{% endblock %}
+{% block conteudo %}
+
+<h2>Ofertas Kimberly</h2>
+<p style="color:var(--muted); font-size:13.5px; margin-top:-8px;">
+  Sem tag "Cad. Oferta" limpa nos relatórios pra promoção — o portfólio geral abaixo
+  é só pra exploração. Pra marcar a promoção, rode
+  <code>python manage.py importar_kimberly --produto "..." --venda-max ... --data-inicio AAAA-MM-DD --data-fim AAAA-MM-DD</code>.
+</p>
+
+{% if not kpis.itens %}
+  <div class="aviso">
+    Nenhum lançamento importado ainda. Copie o relatório da Kimberly pra
+    <code>dados/entrada/</code> e rode <code>python manage.py importar_kimberly --arquivo "..."</code>
+    (há mais de um arquivo Kimberly — passe o caminho explicitamente).
+  </div>
+{% elif not tem_oferta_marcada %}
+  <div class="aviso">
+    Portfólio geral importado, mas nenhuma linha foi marcada como promoção ainda.
+    Confirme com o Gabriel o produto/janela/preço da promoção e rode o importador
+    de novo com os filtros.
+  </div>
+{% endif %}
+
+{% if tem_oferta_marcada %}
+<h3>Promoção identificada manualmente <small style="color:var(--muted); font-weight:400;">— confirmar com o Gabriel</small></h3>
+<div class="cards">
+  <div class="card"><div class="rotulo">Itens</div><div class="valor">{{ kpis_oferta.itens|numero }}</div></div>
+  <div class="card"><div class="rotulo">Venda</div><div class="valor">{{ kpis_oferta.venda|brl }}</div></div>
+  <div class="card"><div class="rotulo">Lucro</div><div class="valor">{{ kpis_oferta.lucro|brl }}</div></div>
+</div>
+{% endif %}
+
+<h3>Portfólio geral</h3>
+<div class="cards">
+  <div class="card"><div class="rotulo">Produtos</div><div class="valor">{{ kpis.produtos }}</div></div>
+  <div class="card"><div class="rotulo">Itens vendidos</div><div class="valor">{{ kpis.itens|numero }}</div></div>
+  <div class="card"><div class="rotulo">Venda</div><div class="valor">{{ kpis.venda|brl }}</div></div>
+  <div class="card"><div class="rotulo">Lucro</div><div class="valor">{{ kpis.lucro|brl }}</div></div>
+</div>
+
+<h3 style="margin-top:24px;">Venda por mês</h3>
+<table>
+  <thead>
+    <tr><th>Mês</th><th>Itens</th><th>Venda</th><th>Lucro</th></tr>
+  </thead>
+  <tbody>
+    {% for m in por_mes %}
+      <tr>
+        <td>{{ m.ano_mes }}</td>
+        <td>{{ m.itens|numero }}</td>
+        <td>{{ m.venda|brl }}</td>
+        <td>{{ m.lucro|brl }}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="4" class="vazio">Sem dados.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<h3 style="margin-top:24px;">Produtos <small style="color:var(--muted); font-weight:400;">— ✓ = tem linha marcada como promoção</small></h3>
+<form method="get" style="margin-bottom:10px;">
+  {% if bandeira_atual %}<input type="hidden" name="bandeira" value="{{ bandeira_atual }}">{% endif %}
+  <input type="text" name="busca" value="{{ busca }}" placeholder="Buscar produto…"
+         style="padding:6px 10px; border-radius:6px; border:1px solid var(--border); width:280px;">
+  <button type="submit" style="padding:6px 12px; border-radius:6px; border:1px solid var(--border); background:#fff; cursor:pointer;">Buscar</button>
+</form>
+<table>
+  <thead>
+    <tr><th></th><th>Produto</th><th>Itens</th><th>Venda</th><th>Lucro</th></tr>
+  </thead>
+  <tbody>
+    {% for p in produtos %}
+      <tr>
+        <td>{% if p.em_oferta %}✓{% endif %}</td>
+        <td>{{ p.produto }}</td>
+        <td>{{ p.itens|numero }}</td>
+        <td>{{ p.venda|brl }}</td>
+        <td>{{ p.lucro|brl }}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="5" class="vazio">Sem dados.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+{% endblock %}

@@ -410,6 +410,76 @@ def calcular_marketing(queryset, busca: str = ''):
     }
 
 
+def calcular_kimberly(queryset, busca: str = ''):
+    """Ofertas Kimberly: sem tag limpa nos relatórios pra promoção Hipzinha
+    (achado inspecionando os arquivos, não documentado no docx) — o
+    portfólio geral é importado pra exploração, e o subconjunto marcado
+    manualmente como oferta (`importar_kimberly --produto/--venda-max/...`)
+    vira um bloco separado, deixando claro que é curadoria manual."""
+    linhas = queryset.select_related('loja').values(
+        'loja_id', 'loja__codigo', 'loja__bandeira', 'produto_descricao',
+        'grupo', 'ano_mes', 'itens', 'venda', 'custo', 'lucro',
+    )
+
+    total_itens = ZERO
+    total_venda = ZERO
+    total_lucro = ZERO
+    oferta_itens = ZERO
+    oferta_venda = ZERO
+    oferta_lucro = ZERO
+
+    por_mes = defaultdict(lambda: {'itens': ZERO, 'venda': ZERO, 'lucro': ZERO})
+    por_produto = defaultdict(lambda: {'itens': ZERO, 'venda': ZERO, 'custo': ZERO, 'lucro': ZERO, 'em_oferta': False})
+
+    for linha in linhas:
+        itens = linha['itens'] or ZERO
+        venda = linha['venda'] or ZERO
+        custo = linha['custo'] or ZERO
+        lucro = linha['lucro'] or ZERO
+        em_oferta = linha['grupo'] == Lancamento.GRUPO_OFERTA
+
+        total_itens += itens
+        total_venda += venda
+        total_lucro += lucro
+        if em_oferta:
+            oferta_itens += itens
+            oferta_venda += venda
+            oferta_lucro += lucro
+
+        mes = por_mes[linha['ano_mes']]
+        mes['itens'] += itens
+        mes['venda'] += venda
+        mes['lucro'] += lucro
+
+        produto = por_produto[linha['produto_descricao']]
+        produto['itens'] += itens
+        produto['venda'] += venda
+        produto['custo'] += custo
+        produto['lucro'] += lucro
+        produto['em_oferta'] = produto['em_oferta'] or em_oferta
+
+    produtos = [
+        {'produto': nome, **valores} for nome, valores in por_produto.items()
+        if not busca or busca.lower() in nome.lower()
+    ]
+    produtos.sort(key=lambda p: p['venda'], reverse=True)
+
+    return {
+        'kpis': {
+            'itens': total_itens, 'venda': total_venda, 'lucro': total_lucro,
+            'produtos': len(por_produto),
+        },
+        'kpis_oferta': {
+            'itens': oferta_itens, 'venda': oferta_venda, 'lucro': oferta_lucro,
+        },
+        'tem_oferta_marcada': oferta_itens > 0,
+        'por_mes': [
+            {'ano_mes': mes, **valores} for mes, valores in sorted(por_mes.items())
+        ],
+        'produtos': produtos,
+    }
+
+
 MECANICAS_INFO = [
     (Lancamento.LEVE3, 'Leve 3 Pague 2'),
     (Lancamento.SUPRACORP, 'Degustação Supra Corp Day'),

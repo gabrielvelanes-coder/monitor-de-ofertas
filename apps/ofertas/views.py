@@ -7,8 +7,8 @@ from apps.lojas.models import Loja
 from .models import Lancamento
 from .services import (
     MECANICAS_INFO, bandeira_da_request, calcular_cestoes,
-    calcular_impacto_fabricante, calcular_leve3, calcular_marketing,
-    calcular_supracorp, filtrar_por_bandeira,
+    calcular_impacto_fabricante, calcular_kimberly, calcular_leve3,
+    calcular_marketing, calcular_supracorp, filtrar_por_bandeira,
 )
 
 FABRICANTES = {
@@ -141,3 +141,21 @@ def marketing(request):
         **dados,
     }
     return render(request, 'ofertas/marketing.html', contexto)
+
+
+def kimberly(request):
+    bandeira = bandeira_da_request(request)
+    busca = request.GET.get('busca', '').strip()
+
+    queryset = filtrar_por_bandeira(
+        Lancamento.objects.filter(mecanica=Lancamento.KIMBERLY), bandeira
+    )
+    dados = calcular_kimberly(queryset, busca=busca)
+
+    contexto = {
+        'secao': 'kimberly',
+        'bandeira_atual': bandeira,
+        'busca': busca,
+        **dados,
+    }
+    return render(request, 'ofertas/kimberly.html', contexto)
