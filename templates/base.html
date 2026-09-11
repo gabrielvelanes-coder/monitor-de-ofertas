@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Painel de Ofertas{% endblock %} · Grupo Velanes</title>
+  <style>
+    :root {
+      --bg: #f6f7f9; --card: #ffffff; --border: #e3e6ea; --text: #1f2430;
+      --muted: #6b7280; --accent: #2f6feb; --accent-bg: #eaf1ff;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: var(--bg); color: var(--text);
+      font: 15px/1.5 -apple-system, "Segoe UI", Roboto, sans-serif;
+    }
+    header {
+      background: var(--card); border-bottom: 1px solid var(--border);
+      padding: 14px 24px; display: flex; align-items: center; gap: 18px;
+      flex-wrap: wrap;
+    }
+    header h1 { font-size: 17px; margin: 0; white-space: nowrap; }
+    header h1 span { color: var(--muted); font-weight: 400; }
+    nav { display: flex; gap: 4px; flex-wrap: wrap; }
+    nav a {
+      color: var(--text); text-decoration: none; padding: 6px 10px;
+      border-radius: 6px; font-size: 13.5px;
+    }
+    nav a:hover { background: var(--accent-bg); }
+    nav a.ativo { background: var(--accent); color: #fff; }
+    .filtro-bandeira { margin-left: auto; display: flex; gap: 6px; align-items: center; }
+    .filtro-bandeira select {
+      padding: 5px 8px; border-radius: 6px; border: 1px solid var(--border);
+      font-size: 13.5px;
+    }
+    main { padding: 24px; max-width: 1200px; margin: 0 auto; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 24px; }
+    .card {
+      background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+      padding: 14px 16px;
+    }
+    .card .rotulo { color: var(--muted); font-size: 12.5px; text-transform: uppercase; letter-spacing: .03em; }
+    .card .valor { font-size: 24px; font-weight: 600; margin-top: 4px; }
+    table { width: 100%; border-collapse: collapse; background: var(--card); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+    th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--border); font-size: 13.5px; }
+    th { background: #fafbfc; color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; }
+    tr:last-child td { border-bottom: none; }
+    .aviso {
+      background: #fff8e6; border: 1px solid #f0d792; color: #7a5a00;
+      padding: 10px 14px; border-radius: 8px; font-size: 13.5px; margin-bottom: 18px;
+    }
+    .vazio { color: var(--muted); font-style: italic; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Painel de Ofertas <span>· Grupo Velanes</span></h1>
+    <nav>
+      <a href="{% url 'ofertas:home' %}" class="{% if secao == 'home' %}ativo{% endif %}">Início</a>
+    </nav>
+    <form class="filtro-bandeira" method="get">
+      <label for="bandeira">Bandeira</label>
+      <select name="bandeira" id="bandeira" onchange="this.form.submit()">
+        <option value="" {% if not bandeira_atual %}selected{% endif %}>Todas</option>
+        <option value="velanes" {% if bandeira_atual == 'velanes' %}selected{% endif %}>Velanes</option>
+        <option value="ultra_popular" {% if bandeira_atual == 'ultra_popular' %}selected{% endif %}>Ultra Popular</option>
+      </select>
+    </form>
+  </header>
+  <main>
+    {% block conteudo %}{% endblock %}
+  </main>
+</body>
+</html>
