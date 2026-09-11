@@ -3,7 +3,20 @@
 {% block title %}Dashboard{% endblock %}
 {% block conteudo %}
 
-<h2 style="margin-top:0;">Resumo executivo</h2>
+<div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+  <h2 style="margin-top:0; margin-bottom:0;">Resumo executivo</h2>
+  <form method="get" style="display:flex; align-items:center; gap:6px;">
+    {% if bandeira_atual %}<input type="hidden" name="bandeira" value="{{ bandeira_atual }}">{% endif %}
+    <label for="mes">Mês</label>
+    <select name="mes" id="mes" onchange="this.form.submit()"
+            style="padding:5px 8px; border-radius:6px; border:1px solid var(--border); font-size:13.5px;">
+      <option value="" {% if not mes_atual %}selected{% endif %}>Todos os meses</option>
+      {% for m in meses_disponiveis %}
+        <option value="{{ m }}" {% if mes_atual == m %}selected{% endif %}>{{ m }}</option>
+      {% endfor %}
+    </select>
+  </form>
+</div>
 
 <div class="cards">
   <div class="card"><div class="rotulo">Venda em oferta (todas as ações)</div><div class="valor">{{ total_venda|brl }}</div></div>

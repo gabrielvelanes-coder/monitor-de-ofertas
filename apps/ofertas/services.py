@@ -44,6 +44,14 @@ def filtrar_por_bandeira(queryset, bandeira: str):
     return queryset
 
 
+def meses_disponiveis() -> list:
+    """Todos os ano_mes distintos já importados, em qualquer ação — pro
+    filtro de mês do dashboard."""
+    return sorted(
+        v for v in Lancamento.objects.values_list('ano_mes', flat=True).distinct() if v
+    )
+
+
 def querystring_extra(request, excluir=('bandeira',)) -> dict:
     """Parâmetros de GET a preservar no form de bandeira (busca, fabricante
     selecionado etc.) — pra trocar a bandeira sem perder o resto do filtro."""

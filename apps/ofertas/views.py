@@ -10,7 +10,7 @@ from .services import (
     ACOES_INFO, bandeira_da_request, calcular_cestoes,
     calcular_impacto_fabricante, calcular_kimberly, calcular_leve3,
     calcular_marketing, calcular_supracorp, filtrar_por_bandeira,
-    grafico_mensal, querystring_extra,
+    grafico_mensal, meses_disponiveis, querystring_extra,
 )
 
 ZERO = Decimal('0')
@@ -23,12 +23,15 @@ FABRICANTES = {
 }
 
 
-def _resumo_executivo(bandeira):
+def _resumo_executivo(bandeira, mes=''):
     """1 linha por ação, com a fatia de venda/lucro/itens que representa a
     oferta (não o catálogo de referência inteiro) — pra home funcionar como
-    dashboard executivo."""
+    dashboard executivo. `mes` (AAAA-MM) filtra pra 1 mês só; vazio = todos."""
     def qs(mecanica):
-        return filtrar_por_bandeira(Lancamento.objects.filter(mecanica=mecanica), bandeira)
+        queryset = filtrar_por_bandeira(Lancamento.objects.filter(mecanica=mecanica), bandeira)
+        if mes:
+            queryset = queryset.filter(ano_mes=mes)
+        return queryset
 
     acoes = []
 
@@ -80,11 +83,15 @@ def _resumo_executivo(bandeira):
 
 def home(request):
     bandeira = bandeira_da_request(request)
+    meses = meses_disponiveis()
+    mes = request.GET.get('mes', '').strip()
+    if mes not in meses:
+        mes = ''
 
     lojas_velanes = Loja.objects.filter(bandeira=Loja.VELANES).count()
     lojas_ultra = Loja.objects.filter(bandeira=Loja.ULTRA_POPULAR).count()
 
-    resumo = _resumo_executivo(bandeira)
+    resumo = _resumo_executivo(bandeira, mes)
     grafico = {
         'labels': [a['rotulo'] for a in resumo['acoes']],
         'series': [{'label': 'Venda', 'data': [float(a['venda']) for a in resumo['acoes']]}],
@@ -94,6 +101,8 @@ def home(request):
         'secao': 'home',
         'bandeira_atual': bandeira,
         'querystring_extra': querystring_extra(request),
+        'meses_disponiveis': meses,
+        'mes_atual': mes,
         'lojas_velanes': lojas_velanes,
         'lojas_ultra': lojas_ultra,
         'grafico': grafico,
