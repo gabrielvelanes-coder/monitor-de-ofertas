@@ -30,7 +30,7 @@
 
 <div class="cards">
   <div class="card"><div class="rotulo">Itens vendidos</div><div class="valor">{{ kpis.itens|numero }}</div></div>
-  <div class="card"><div class="rotulo">Ciclos</div><div class="valor">{{ kpis.ciclos|numero }}</div></div>
+  <div class="card"><div class="rotulo">Combos</div><div class="valor">{{ kpis.ciclos|numero }}</div></div>
   <div class="card"><div class="rotulo">Investimento a reembolsar</div><div class="valor">{{ kpis.investimento|brl }}</div></div>
   <div class="card"><div class="rotulo">Margem contábil</div><div class="valor">{{ kpis.margem_contabil|brl }}</div></div>
   <div class="card"><div class="rotulo">Margem ajustada</div><div class="valor">{{ kpis.margem_ajustada|brl }}</div></div>
@@ -89,7 +89,7 @@
        placeholder="Buscar produto… (filtra na hora)" class="campo-busca" style="margin-bottom:10px;">
 <table id="tabela-produtos" class="tabela-interativa">
   <thead>
-    <tr><th>Produto</th><th>Itens</th><th>Ciclos</th><th>Investimento</th><th>Venda</th><th>Lucro</th></tr>
+    <tr><th>Produto</th><th>Itens</th><th>Combos</th><th>Investimento</th><th>Venda</th><th>Lucro</th></tr>
   </thead>
   <tbody>
     {% for p in produtos %}

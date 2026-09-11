@@ -7,16 +7,22 @@
     return PALETA[indice % PALETA.length];
   }
 
+  // Chart.js desenha texto em <canvas> — o text-transform:uppercase do CSS
+  // não alcança, então maiusculiza aqui pra bater com o resto da UI.
+  function maiuscula(texto) {
+    return String(texto).toUpperCase();
+  }
+
   window.graficoLinha = function (canvasId, labels, series) {
     var elemento = document.getElementById(canvasId);
     if (!elemento) return null;
     return new Chart(elemento, {
       type: 'line',
       data: {
-        labels: labels,
+        labels: labels.map(maiuscula),
         datasets: series.map(function (s, i) {
           return {
-            label: s.label,
+            label: maiuscula(s.label),
             data: s.data,
             borderColor: corDaSerie(i),
             backgroundColor: corDaSerie(i),
@@ -39,10 +45,11 @@
   window.iniciarDrillDown = function (chart, seriesPorItem, rotuloMetrica) {
     var datasetExtra = null;
     return function (nome) {
+      var rotulo = maiuscula(rotuloMetrica ? nome + ' — ' + rotuloMetrica : nome);
       if (datasetExtra) {
         var i = chart.data.datasets.indexOf(datasetExtra);
         if (i !== -1) chart.data.datasets.splice(i, 1);
-        if (datasetExtra.label === (rotuloMetrica ? nome + ' — ' + rotuloMetrica : nome)) {
+        if (datasetExtra.label === rotulo) {
           datasetExtra = null;
           chart.options.plugins.legend.display = chart.data.datasets.length > 1;
           chart.update();
@@ -51,7 +58,7 @@
       }
       if (seriesPorItem[nome]) {
         datasetExtra = {
-          label: rotuloMetrica ? nome + ' — ' + rotuloMetrica : nome,
+          label: rotulo,
           data: seriesPorItem[nome],
           borderColor: '#c93f6f', backgroundColor: '#c93f6f',
           borderWidth: 3, tension: 0.25, pointRadius: 4,
@@ -69,10 +76,10 @@
     return new Chart(elemento, {
       type: 'bar',
       data: {
-        labels: labels,
+        labels: labels.map(maiuscula),
         datasets: series.map(function (s, i) {
           return {
-            label: s.label,
+            label: maiuscula(s.label),
             data: s.data,
             backgroundColor: (destaqueIndices && series.length === 1)
               ? labels.map(function (_, idx) {
