@@ -41,7 +41,7 @@
 <h3>Ranking de ações</h3>
 <table id="tabela-acoes" class="tabela-interativa">
   <thead>
-    <tr><th>Ação</th><th>Itens</th><th>Venda</th><th>Lucro</th></tr>
+    <tr><th>Ação</th><th>Itens</th><th>Venda</th><th>Lucro</th><th>CMV %</th></tr>
   </thead>
   <tbody>
     {% for a in acoes %}
@@ -50,9 +50,10 @@
         <td>{{ a.itens|numero }}</td>
         <td>{{ a.venda|brl }}</td>
         <td>{{ a.lucro|brl }}</td>
+        <td>{{ a.cmv_pct|numero:1 }}%</td>
       </tr>
     {% empty %}
-      <tr><td colspan="4" class="vazio">Sem dados.</td></tr>
+      <tr><td colspan="5" class="vazio">Sem dados.</td></tr>
     {% endfor %}
   </tbody>
 </table>

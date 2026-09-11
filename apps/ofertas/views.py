@@ -72,6 +72,9 @@ def _resumo_executivo(bandeira, mes=''):
         'venda': d['kpis_oferta']['venda'], 'lucro': d['kpis_oferta']['lucro'], 'itens': d['kpis_oferta']['itens'],
     })
 
+    for a in acoes:
+        a['cmv_pct'] = (100 - (a['lucro'] / a['venda'] * 100)) if a['venda'] else ZERO
+
     acoes.sort(key=lambda a: a['venda'], reverse=True)
     return {
         'acoes': acoes,

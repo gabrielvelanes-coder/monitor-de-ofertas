@@ -33,7 +33,7 @@ e rode o comando correspondente:
 
 ```
 python manage.py importar_lojas                 # DADOS GRUPO VELANES ATUALIZADO*.xlsx
-python manage.py importar_leve3                  # LEVE 3 PAGUE 2.xls
+python manage.py importar_leve3                  # genericos_<bimestre>_2026.xls (todos em dados/entrada/)
 python manage.py importar_cestoes                # CESTOES*.xls
 python manage.py importar_supracorp              # supracorp day.xls
 python manage.py importar_kenvue                 # baseline kenvue*.xls
