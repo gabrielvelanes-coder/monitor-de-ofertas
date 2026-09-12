@@ -7,11 +7,26 @@ este projeto) e do app "AÇÕES DE MARKETING - CAMPANHAS".
 
 Mecânicas cobertas: Leve 3 Pague 2 · Degustação Supra Corp Day · Ofertas
 Kenvue · Ofertas Principia · Ofertas Botica · Ofertas Procter · Ofertas
-Kimberly · Cestões · Itens do Marketing. Sem módulo de verba/recebimento
-nesta primeira versão — só performance.
+Kimberly · Cestões · Itens do Marketing — todas com importador, tela,
+menu lateral, dashboard executivo e gráficos (Chart.js local, sem CDN).
+Mais uma referência sem tela própria no menu — Sellout (EMS/Eurofarma/
+Germed/Prati, giro completo do fabricante) — usada só pra medir o
+impacto do Leve 3 sobre o fabricante. Sem módulo de verba/recebimento
+nesta primeira versão — só performance (ver "Pendências" abaixo).
 
 As regras de negócio (fórmulas, tags de "Cad. Oferta" por mecânica,
 heurística de bandeira) vêm de `../Painel_de_Ofertas_Documentacao.docx`.
+
+**Correção (12/09/26) — Impacto por Fabricante (Kenvue/Principia/Botica/
+Procter):** a comparação "base vs. oferta" era feita entre a tag literal
+"Sem Desconto" (preço cheio) e a tag exata da promoção, descartando toda
+venda com qualquer outra tag (Todo Dia, Cestão, Marketing, outras
+campanhas do fabricante) — isso subestimava a base e, em vários meses,
+fazia a venda "sem oferta" parecer menor que a venda "com oferta"
+(inconsistência notada pelo Gabriel). Corrigido: oferta = só a tag exata
+do fabricante; base = todo o resto das vendas dele, "Sem Desconto"
+incluído. Os 4 fabricantes foram reimportados; base agora é sempre maior
+que oferta, em todo mês.
 
 ## Rodando localmente
 
@@ -57,10 +72,18 @@ Leve 3 Pague 2 · Cestões · Degustação Supra Corp Day · Ofertas Kenvue ·
 Ofertas Principia · Ofertas Botica · Ofertas Procter · Itens do Marketing ·
 Ofertas Kimberly — todas com importador + tela em `/`.
 
-## Não incluído nesta versão
+## Pendências
 
-- Controle de verba/recebimento (contas a receber por indústria) — decisão
-  explícita, fica pra uma 2ª etapa.
-- Gráficos (as telas usam tabelas por ora).
-- Mecânica de verba pra Kenvue/Principia/Botica/Procter — pendente de
-  definição (docx, seção 5.3), as telas mostram só performance.
+- **Controle de verba/recebimento + CMV com/sem verba (2ª etapa, em
+  planejamento a partir de 12/09/26):** Gabriel pediu um local pra apurar
+  as verbas recebidas das indústrias (referência: aba "Verba &
+  Recebimento" do painel antigo, docx seção 7.5/8 — valor apurado, valor
+  recebido, data, status Pendente/Parcial/Recebido) e que o CMV do painel
+  passe a ser sempre analisado em duas versões: com verba e sem verba.
+  Hoje só o Leve 3 tem fórmula de reembolso validada (margem contábil →
+  ajustada); Kenvue/Principia/Botica/Procter não têm mecânica de verba
+  definida (docx, seção 5.3) — decisão explícita do Gabriel: só planejar
+  por ora, sem executar.
+- Kimberly: importador aceita curadoria manual (`--produto`/
+  `--venda-max`/`--data-inicio`/`--data-fim`), mas a fórmula ainda
+  precisa da validação do Gabriel.
