@@ -74,16 +74,15 @@ Ofertas Kimberly — todas com importador + tela em `/`.
 
 ## Pendências
 
-- **Controle de verba/recebimento + CMV com/sem verba (2ª etapa, em
-  planejamento a partir de 12/09/26):** Gabriel pediu um local pra apurar
-  as verbas recebidas das indústrias (referência: aba "Verba &
-  Recebimento" do painel antigo, docx seção 7.5/8 — valor apurado, valor
-  recebido, data, status Pendente/Parcial/Recebido) e que o CMV do painel
-  passe a ser sempre analisado em duas versões: com verba e sem verba.
-  Hoje só o Leve 3 tem fórmula de reembolso validada (margem contábil →
-  ajustada); Kenvue/Principia/Botica/Procter não têm mecânica de verba
-  definida (docx, seção 5.3) — decisão explícita do Gabriel: só planejar
-  por ora, sem executar.
+- **Controle de verba/recebimento + CMV com/sem verba (2ª etapa) — plano
+  pronto em [`docs/PLANO_VERBA.md`](docs/PLANO_VERBA.md), ainda não
+  implementado.** Decisões já confirmadas com o Gabriel: app novo
+  `apps/verba` (modelo `VerbaMensal`, 1 linha por mecânica+mês); entrada
+  de dado só via Django Admin; CMV "com verba" usa o valor apurado
+  (teórico), não o recebido; as 9 ações devem entrar eventualmente, mas
+  só Leve 3 tem fórmula de apuração validada hoje — as outras 8 ficam
+  como pendência a definir uma a uma. Decisão explícita do Gabriel: só
+  planejar por ora, sem executar.
 - Kimberly: importador aceita curadoria manual (`--produto`/
   `--venda-max`/`--data-inicio`/`--data-fim`), mas a fórmula ainda
   precisa da validação do Gabriel.
