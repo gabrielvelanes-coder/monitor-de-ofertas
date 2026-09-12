@@ -86,3 +86,8 @@ Ofertas Kimberly — todas com importador + tela em `/`.
 - Kimberly: importador aceita curadoria manual (`--produto`/
   `--venda-max`/`--data-inicio`/`--data-fim`), mas a fórmula ainda
   precisa da validação do Gabriel.
+- `erp.fabricante_generico()` (Leve 3 por fabricante) hoje é heurística
+  pela sigla no fim do nome do produto (~2,7% não identificado). Gabriel
+  vai mandar uma base de cadastro própria (produto → fabricante) pra
+  substituir a heurística e zerar o "não identificado" — aguardando o
+  arquivo.

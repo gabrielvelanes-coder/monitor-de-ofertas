@@ -155,7 +155,7 @@ def cestoes(request):
         Lancamento.objects.filter(mecanica=Lancamento.CESTOES), bandeira
     )
     dados = calcular_cestoes(queryset, busca=busca)
-    grafico = grafico_mensal(dados['por_mes'], [('venda', 'Venda'), ('lucro', 'Lucro')])
+    grafico = grafico_mensal(dados['por_mes'], [('venda', 'Venda')])
 
     contexto = {
         'secao': 'cestoes',
