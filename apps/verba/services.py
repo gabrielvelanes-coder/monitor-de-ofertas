@@ -71,3 +71,27 @@ def cmv_pct_com_verba(venda: Decimal, lucro: Decimal, valor_apurado: Decimal | N
     if not venda or valor_apurado is None:
         return None
     return 100 - ((lucro + valor_apurado) / venda * 100)
+
+
+def anexar_cmv(linhas, campo_venda: str, campo_lucro: str, campo_verba: str | None = None):
+    """Acrescenta 'cmv_pct_sem_verba'/'cmv_pct_com_verba' em cada dict de
+    `linhas` (ranking_lojas, produtos, ranking_bandeiras, por_fabricante —
+    qualquer lista de dict que calcular_* devolve), pros nomes de tabela
+    ficarem iguais em toda ação (docx não define isso, foi pedido do
+    Gabriel de consistência visual).
+
+    `campo_venda`/`campo_lucro` variam por mecânica (ex. 'venda'/'lucro'
+    ou 'venda_oferta'/'lucro_oferta') — passe o nome do campo, não o
+    valor. `campo_verba`, se informado, é o nome do campo que já traz o
+    valor de verba calculado POR LINHA (hoje só existe isso no Leve3:
+    'investimento', calculado linha a linha desde calcular_leve3). Sem
+    esse campo, cmv_pct_com_verba fica None — nunca ratear o valor
+    agregado de VerbaMensal por loja/produto sem uma fórmula validada
+    pra isso."""
+    for linha in linhas:
+        venda = linha[campo_venda] or ZERO
+        lucro = linha[campo_lucro] or ZERO
+        linha['cmv_pct_sem_verba'] = cmv_pct(venda, lucro)
+        valor_verba = linha.get(campo_verba) if campo_verba else None
+        linha['cmv_pct_com_verba'] = cmv_pct_com_verba(venda, lucro, valor_verba)
+    return linhas

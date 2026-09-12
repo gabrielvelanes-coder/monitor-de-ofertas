@@ -52,36 +52,42 @@
 </div>
 <table data-painel="lojas-leve3" data-valor="macro" class="tabela-interativa">
   <thead>
-    <tr><th>Bandeira</th><th>Investimento</th><th>Margem contábil</th><th>Margem ajustada</th></tr>
+    <tr><th>Bandeira</th><th>Itens</th><th>Venda</th><th>CMV %</th><th>Lucro</th><th>CMV % com verba</th><th>Investimento</th></tr>
   </thead>
   <tbody>
     {% for b in ranking_bandeiras %}
       <tr>
         <td>{{ b.bandeira }}</td>
-        <td>{{ b.investimento|brl }}</td>
+        <td>{{ b.itens|numero }}</td>
+        <td>{{ b.venda|brl }}</td>
+        <td>{{ b.cmv_pct_sem_verba|numero:1 }}%</td>
         <td>{{ b.margem_contabil|brl }}</td>
-        <td>{{ b.margem_ajustada|brl }}</td>
+        <td>{{ b.cmv_pct_com_verba|numero:1 }}%</td>
+        <td>{{ b.investimento|brl }}</td>
       </tr>
     {% empty %}
-      <tr><td colspan="4" class="vazio">Sem dados.</td></tr>
+      <tr><td colspan="7" class="vazio">Sem dados.</td></tr>
     {% endfor %}
   </tbody>
 </table>
 <table data-painel="lojas-leve3" data-valor="detalhe" class="tabela-interativa" hidden>
   <thead>
-    <tr><th>Loja</th><th>Bandeira</th><th>Investimento</th><th>Margem contábil</th><th>Margem ajustada</th></tr>
+    <tr><th>Loja</th><th>Bandeira</th><th>Itens</th><th>Venda</th><th>CMV %</th><th>Lucro</th><th>CMV % com verba</th><th>Investimento</th></tr>
   </thead>
   <tbody>
     {% for l in ranking_lojas %}
       <tr>
         <td>{{ l.codigo }}</td>
         <td>{{ l.bandeira|bandeira_rotulo }}</td>
-        <td>{{ l.investimento|brl }}</td>
+        <td>{{ l.itens|numero }}</td>
+        <td>{{ l.venda|brl }}</td>
+        <td>{{ l.cmv_pct_sem_verba|numero:1 }}%</td>
         <td>{{ l.margem_contabil|brl }}</td>
-        <td>{{ l.margem_ajustada|brl }}</td>
+        <td>{{ l.cmv_pct_com_verba|numero:1 }}%</td>
+        <td>{{ l.investimento|brl }}</td>
       </tr>
     {% empty %}
-      <tr><td colspan="5" class="vazio">Sem dados.</td></tr>
+      <tr><td colspan="8" class="vazio">Sem dados.</td></tr>
     {% endfor %}
   </tbody>
 </table>
@@ -91,20 +97,22 @@
        placeholder="Buscar produto… (filtra na hora)" class="campo-busca" style="margin-bottom:10px;">
 <table id="tabela-produtos" class="tabela-interativa">
   <thead>
-    <tr><th>Produto</th><th>Itens</th><th>Combos</th><th>Investimento</th><th>Venda</th><th>Lucro</th></tr>
+    <tr><th>Produto</th><th>Itens</th><th>Venda</th><th>CMV %</th><th>Lucro</th><th>CMV % com verba</th><th>Combos</th><th>Investimento</th></tr>
   </thead>
   <tbody>
     {% for p in produtos %}
       <tr class="linha-clicavel" data-produto="{{ p.produto }}">
         <td>{{ p.produto }}</td>
         <td>{{ p.itens|numero }}</td>
+        <td>{{ p.venda|brl }}</td>
+        <td>{{ p.cmv_pct_sem_verba|numero:1 }}%</td>
+        <td>{{ p.lucro|brl }}</td>
+        <td>{{ p.cmv_pct_com_verba|numero:1 }}%</td>
         <td>{{ p.ciclos|numero }}</td>
         <td>{{ p.investimento|brl }}</td>
-        <td>{{ p.venda|brl }}</td>
-        <td>{{ p.lucro|brl }}</td>
       </tr>
     {% empty %}
-      <tr><td colspan="6" class="vazio">Sem dados.</td></tr>
+      <tr><td colspan="8" class="vazio">Sem dados.</td></tr>
     {% endfor %}
   </tbody>
 </table>

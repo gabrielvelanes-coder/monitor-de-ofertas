@@ -3,20 +3,7 @@
 {% block title %}Dashboard{% endblock %}
 {% block conteudo %}
 
-<div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
-  <h2 style="margin-top:0; margin-bottom:0;">Resumo executivo</h2>
-  <form method="get" style="display:flex; align-items:center; gap:6px;">
-    {% if bandeira_atual %}<input type="hidden" name="bandeira" value="{{ bandeira_atual }}">{% endif %}
-    <label for="mes">Mês</label>
-    <select name="mes" id="mes" onchange="this.form.submit()"
-            style="padding:5px 8px; border-radius:6px; border:1px solid var(--border); font-size:13.5px;">
-      <option value="" {% if not mes_atual %}selected{% endif %}>Todos os meses</option>
-      {% for m in meses_disponiveis %}
-        <option value="{{ m }}" {% if mes_atual == m %}selected{% endif %}>{{ m }}</option>
-      {% endfor %}
-    </select>
-  </form>
-</div>
+<h2 style="margin-top:0;">Resumo executivo</h2>
 
 <div class="cards">
   <div class="card"><div class="rotulo">Venda em oferta (todas as ações)</div><div class="valor">{{ total_venda|brl }}</div></div>
@@ -41,7 +28,7 @@
 <h3>Ranking de ações</h3>
 <table id="tabela-acoes" class="tabela-interativa">
   <thead>
-    <tr><th>Ação</th><th>Itens</th><th>Venda</th><th>Lucro</th><th>CMV % sem verba</th><th>CMV % com verba</th></tr>
+    <tr><th>Ação</th><th>Itens</th><th>Venda</th><th>CMV %</th><th>Lucro</th><th>CMV % com verba</th></tr>
   </thead>
   <tbody>
     {% for a in acoes %}
@@ -49,8 +36,8 @@
         <td>{% if a.url_arg %}<a href="{% url a.url a.url_arg %}">{{ a.rotulo }}</a>{% else %}<a href="{% url a.url %}">{{ a.rotulo }}</a>{% endif %}</td>
         <td>{{ a.itens|numero }}</td>
         <td>{{ a.venda|brl }}</td>
-        <td>{{ a.lucro|brl }}</td>
         <td>{{ a.cmv_pct_sem_verba|numero:1 }}%</td>
+        <td>{{ a.lucro|brl }}</td>
         <td>{% if a.cmv_pct_com_verba is not None %}{{ a.cmv_pct_com_verba|numero:1 }}%{% else %}<span class="vazio" title="Sem fórmula de verba definida ainda">—</span>{% endif %}</td>
       </tr>
     {% empty %}

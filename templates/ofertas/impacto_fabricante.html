@@ -38,7 +38,7 @@
 </div>
 <table data-painel="lojas-fabricante" data-valor="macro" class="tabela-interativa">
   <thead>
-    <tr><th>Bandeira</th><th>Itens</th><th>Venda</th><th>Lucro</th></tr>
+    <tr><th>Bandeira</th><th>Itens</th><th>Venda</th><th>CMV %</th><th>Lucro</th><th>CMV % com verba</th></tr>
   </thead>
   <tbody>
     {% for b in ranking_bandeiras %}
@@ -46,16 +46,18 @@
         <td>{{ b.bandeira }}</td>
         <td>{{ b.itens_oferta|numero }}</td>
         <td>{{ b.venda_oferta|brl }}</td>
+        <td>{{ b.cmv_pct_sem_verba|numero:1 }}%</td>
         <td>{{ b.lucro_oferta|brl }}</td>
+        <td>{% if b.cmv_pct_com_verba is not None %}{{ b.cmv_pct_com_verba|numero:1 }}%{% else %}<span class="vazio" title="Sem fórmula de verba definida ainda">—</span>{% endif %}</td>
       </tr>
     {% empty %}
-      <tr><td colspan="4" class="vazio">Sem dados.</td></tr>
+      <tr><td colspan="6" class="vazio">Sem dados.</td></tr>
     {% endfor %}
   </tbody>
 </table>
 <table data-painel="lojas-fabricante" data-valor="detalhe" class="tabela-interativa" hidden>
   <thead>
-    <tr><th>Loja</th><th>Bandeira</th><th>Itens</th><th>Venda</th><th>Lucro</th></tr>
+    <tr><th>Loja</th><th>Bandeira</th><th>Itens</th><th>Venda</th><th>CMV %</th><th>Lucro</th><th>CMV % com verba</th></tr>
   </thead>
   <tbody>
     {% for l in ranking_lojas %}
@@ -64,10 +66,12 @@
         <td>{{ l.bandeira|bandeira_rotulo }}</td>
         <td>{{ l.itens_oferta|numero }}</td>
         <td>{{ l.venda_oferta|brl }}</td>
+        <td>{{ l.cmv_pct_sem_verba|numero:1 }}%</td>
         <td>{{ l.lucro_oferta|brl }}</td>
+        <td>{% if l.cmv_pct_com_verba is not None %}{{ l.cmv_pct_com_verba|numero:1 }}%{% else %}<span class="vazio" title="Sem fórmula de verba definida ainda">—</span>{% endif %}</td>
       </tr>
     {% empty %}
-      <tr><td colspan="5" class="vazio">Sem dados.</td></tr>
+      <tr><td colspan="7" class="vazio">Sem dados.</td></tr>
     {% endfor %}
   </tbody>
 </table>
@@ -77,7 +81,7 @@
        placeholder="Buscar produto… (filtra na hora)" class="campo-busca" style="margin-bottom:10px;">
 <table id="tabela-produtos" class="tabela-interativa">
   <thead>
-    <tr><th>Produto</th><th>Itens</th><th>Venda</th><th>Lucro</th></tr>
+    <tr><th>Produto</th><th>Itens</th><th>Venda</th><th>CMV %</th><th>Lucro</th><th>CMV % com verba</th></tr>
   </thead>
   <tbody>
     {% for p in produtos %}
@@ -85,10 +89,12 @@
         <td>{{ p.produto }}</td>
         <td>{{ p.itens_oferta|numero }}</td>
         <td>{{ p.venda_oferta|brl }}</td>
+        <td>{{ p.cmv_pct_sem_verba|numero:1 }}%</td>
         <td>{{ p.lucro_oferta|brl }}</td>
+        <td>{% if p.cmv_pct_com_verba is not None %}{{ p.cmv_pct_com_verba|numero:1 }}%{% else %}<span class="vazio" title="Sem fórmula de verba definida ainda">—</span>{% endif %}</td>
       </tr>
     {% empty %}
-      <tr><td colspan="4" class="vazio">Sem dados.</td></tr>
+      <tr><td colspan="6" class="vazio">Sem dados.</td></tr>
     {% endfor %}
   </tbody>
 </table>

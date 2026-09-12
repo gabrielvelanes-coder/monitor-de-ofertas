@@ -128,6 +128,15 @@
       <div class="barra-topo">
         <form class="filtro-bandeira" method="get">
           {% for chave, valor in querystring_extra.items %}<input type="hidden" name="{{ chave }}" value="{{ valor }}">{% endfor %}
+          {% if meses_disponiveis %}
+            <label for="mes">Mês</label>
+            <select name="mes" id="mes" onchange="this.form.submit()">
+              <option value="" {% if not mes_atual %}selected{% endif %}>Todos os meses</option>
+              {% for m in meses_disponiveis %}
+                <option value="{{ m }}" {% if mes_atual == m %}selected{% endif %}>{{ m }}</option>
+              {% endfor %}
+            </select>
+          {% endif %}
           <label for="bandeira">Bandeira</label>
           <select name="bandeira" id="bandeira" onchange="this.form.submit()">
             <option value="" {% if not bandeira_atual %}selected{% endif %}>Todas</option>

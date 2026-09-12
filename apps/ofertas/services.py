@@ -47,17 +47,27 @@ def filtrar_por_bandeira(queryset, bandeira: str):
     return queryset
 
 
-def meses_disponiveis() -> list:
-    """Todos os ano_mes distintos já importados, em qualquer ação — pro
-    filtro de mês do dashboard."""
-    return sorted(
-        v for v in Lancamento.objects.values_list('ano_mes', flat=True).distinct() if v
-    )
+def meses_disponiveis(mecanica: str = '') -> list:
+    """ano_mes distintos já importados — de todas as ações (dashboard) ou
+    só de uma (`mecanica`, pro filtro de mês dentro de cada tela de ação)."""
+    queryset = Lancamento.objects.all()
+    if mecanica:
+        queryset = queryset.filter(mecanica=mecanica)
+    return sorted(v for v in queryset.values_list('ano_mes', flat=True).distinct() if v)
 
 
-def querystring_extra(request, excluir=('bandeira',)) -> dict:
-    """Parâmetros de GET a preservar no form de bandeira (busca, fabricante
-    selecionado etc.) — pra trocar a bandeira sem perder o resto do filtro."""
+def mes_da_request(request, mecanica: str = '') -> str:
+    """Lê o filtro global de mês (?mes=AAAA-MM), validando contra os meses
+    que existem pra essa mecânica — mês inexistente (ou de outra ação)
+    vira 'Todos os meses' em vez de zerar a tela."""
+    valor = request.GET.get('mes', '').strip()
+    return valor if valor in meses_disponiveis(mecanica) else ''
+
+
+def querystring_extra(request, excluir=('bandeira', 'mes')) -> dict:
+    """Parâmetros de GET a preservar no form de bandeira/mês (busca,
+    fabricante selecionado etc.) — pra trocar um filtro sem perder o
+    resto."""
     return {chave: valor for chave, valor in request.GET.items() if chave not in excluir and valor}
 
 
@@ -117,7 +127,10 @@ def calcular_leve3(queryset, busca: str = ''):
     total_margem_contabil = ZERO
 
     por_mes = defaultdict(lambda: {'itens': ZERO, 'venda': ZERO, 'investimento': ZERO, 'margem_contabil': ZERO, 'margem_ajustada': ZERO})
-    por_loja = defaultdict(lambda: {'codigo': '', 'bandeira': '', 'margem_contabil': ZERO, 'margem_ajustada': ZERO, 'investimento': ZERO})
+    por_loja = defaultdict(lambda: {
+        'codigo': '', 'bandeira': '', 'itens': ZERO, 'venda': ZERO,
+        'margem_contabil': ZERO, 'margem_ajustada': ZERO, 'investimento': ZERO,
+    })
     por_produto = defaultdict(lambda: {'itens': ZERO, 'ciclos': ZERO, 'investimento': ZERO, 'venda': ZERO, 'custo': ZERO, 'lucro': ZERO})
     por_produto_mes = defaultdict(lambda: defaultdict(lambda: ZERO))
 
@@ -148,6 +161,8 @@ def calcular_leve3(queryset, busca: str = ''):
         loja = por_loja[linha['loja_id']]
         loja['codigo'] = linha['loja__codigo']
         loja['bandeira'] = linha['loja__bandeira']
+        loja['itens'] += itens
+        loja['venda'] += venda
         loja['margem_contabil'] += lucro
         loja['margem_ajustada'] += margem_ajustada
         loja['investimento'] += investimento
@@ -182,7 +197,7 @@ def calcular_leve3(queryset, busca: str = ''):
         'por_mes': por_mes_lista,
         'ranking_lojas': sorted(por_loja.values(), key=lambda l: l['investimento'], reverse=True),
         'ranking_bandeiras': agrupar_por_bandeira(
-            por_loja.values(), ['investimento', 'margem_contabil', 'margem_ajustada']
+            por_loja.values(), ['itens', 'venda', 'investimento', 'margem_contabil', 'margem_ajustada']
         ),
         'produtos': produtos,
         'series_produtos': alinhar_com_labels(por_produto_mes, labels),

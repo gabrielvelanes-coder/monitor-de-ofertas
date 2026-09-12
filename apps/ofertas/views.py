@@ -4,7 +4,7 @@ from django.http import Http404
 from django.shortcuts import render
 
 from apps.lojas.models import Loja
-from apps.verba.services import cmv_pct, cmv_pct_com_verba, verba_apurada
+from apps.verba.services import anexar_cmv, cmv_pct, cmv_pct_com_verba, verba_apurada
 
 from .models import Lancamento
 from .services import (
@@ -12,7 +12,7 @@ from .services import (
     calcular_impacto_fabricante, calcular_impacto_leve3_fabricante,
     calcular_kimberly, calcular_leve3, calcular_marketing,
     calcular_supracorp, filtrar_por_bandeira, grafico_mensal,
-    meses_disponiveis, querystring_extra,
+    mes_da_request, meses_disponiveis, querystring_extra,
 )
 
 ZERO = Decimal('0')
@@ -94,9 +94,7 @@ def _resumo_executivo(bandeira, mes=''):
 def home(request):
     bandeira = bandeira_da_request(request)
     meses = meses_disponiveis()
-    mes = request.GET.get('mes', '').strip()
-    if mes not in meses:
-        mes = ''
+    mes = mes_da_request(request)
 
     lojas_velanes = Loja.objects.filter(bandeira=Loja.VELANES).count()
     lojas_ultra = Loja.objects.filter(bandeira=Loja.ULTRA_POPULAR).count()
@@ -125,6 +123,8 @@ def leve3(request):
     bandeira = bandeira_da_request(request)
     busca = request.GET.get('busca', '').strip()
     fabricante = request.GET.get('fabricante', '').strip()
+    meses = meses_disponiveis(Lancamento.LEVE3)
+    mes = mes_da_request(request, Lancamento.LEVE3)
 
     queryset = filtrar_por_bandeira(
         Lancamento.objects.filter(mecanica=Lancamento.LEVE3), bandeira
@@ -134,18 +134,23 @@ def leve3(request):
     )
     if fabricante:
         queryset = queryset.filter(fabricante=fabricante)
+    if mes:
+        queryset = queryset.filter(ano_mes=mes)
 
     dados = calcular_leve3(queryset, busca=busca)
     grafico = grafico_mensal(dados['por_mes'], [('venda', 'Venda')])
     impacto_fabricantes = calcular_impacto_leve3_fabricante()
 
     # CMV com/sem verba usando o investimento já calculado pro recorte atual
-    # (bandeira/fabricante/busca) — não o agregado de VerbaMensal, que é
-    # sempre "todas as lojas" e não tem como refletir esses filtros.
+    # (bandeira/fabricante/busca/mês) — não o agregado de VerbaMensal, que
+    # é sempre "todas as lojas, todos os meses" e não reflete esses filtros.
     dados['kpis']['cmv_pct_sem_verba'] = cmv_pct(dados['kpis']['venda'], dados['kpis']['margem_contabil'])
     dados['kpis']['cmv_pct_com_verba'] = cmv_pct_com_verba(
         dados['kpis']['venda'], dados['kpis']['margem_contabil'], dados['kpis']['investimento']
     )
+    anexar_cmv(dados['ranking_lojas'], 'venda', 'margem_contabil', 'investimento')
+    anexar_cmv(dados['ranking_bandeiras'], 'venda', 'margem_contabil', 'investimento')
+    anexar_cmv(dados['produtos'], 'venda', 'lucro', 'investimento')
 
     contexto = {
         'secao': 'leve3',
@@ -154,6 +159,8 @@ def leve3(request):
         'busca': busca,
         'fabricante_atual': fabricante,
         'fabricantes_disponiveis': fabricantes_disponiveis,
+        'meses_disponiveis': meses,
+        'mes_atual': mes,
         'grafico': grafico,
         'impacto_fabricantes': impacto_fabricantes,
         **dados,
@@ -164,18 +171,27 @@ def leve3(request):
 def cestoes(request):
     bandeira = bandeira_da_request(request)
     busca = request.GET.get('busca', '').strip()
+    meses = meses_disponiveis(Lancamento.CESTOES)
+    mes = mes_da_request(request, Lancamento.CESTOES)
 
     queryset = filtrar_por_bandeira(
         Lancamento.objects.filter(mecanica=Lancamento.CESTOES), bandeira
     )
+    if mes:
+        queryset = queryset.filter(ano_mes=mes)
     dados = calcular_cestoes(queryset, busca=busca)
     grafico = grafico_mensal(dados['por_mes'], [('venda', 'Venda')])
+    anexar_cmv(dados['ranking_lojas'], 'venda', 'lucro')
+    anexar_cmv(dados['ranking_bandeiras'], 'venda', 'lucro')
+    anexar_cmv(dados['produtos'], 'venda', 'lucro')
 
     contexto = {
         'secao': 'cestoes',
         'bandeira_atual': bandeira,
         'querystring_extra': querystring_extra(request),
         'busca': busca,
+        'meses_disponiveis': meses,
+        'mes_atual': mes,
         'grafico': grafico,
         **dados,
     }
@@ -184,10 +200,14 @@ def cestoes(request):
 
 def supracorp(request):
     bandeira = bandeira_da_request(request)
+    meses = meses_disponiveis(Lancamento.SUPRACORP)
+    mes = mes_da_request(request, Lancamento.SUPRACORP)
 
     queryset = filtrar_por_bandeira(
         Lancamento.objects.filter(mecanica=Lancamento.SUPRACORP), bandeira
     )
+    if mes:
+        queryset = queryset.filter(ano_mes=mes)
     dados = calcular_supracorp(queryset)
 
     serie_diaria = dados['serie_diaria']
@@ -201,6 +221,8 @@ def supracorp(request):
         'secao': 'supracorp',
         'bandeira_atual': bandeira,
         'querystring_extra': querystring_extra(request),
+        'meses_disponiveis': meses,
+        'mes_atual': mes,
         'grafico': grafico,
         **dados,
     }
@@ -214,9 +236,14 @@ def impacto_fabricante(request, fabricante):
 
     bandeira = bandeira_da_request(request)
     busca = request.GET.get('busca', '').strip()
+    meses = meses_disponiveis(mecanica)
+    mes = mes_da_request(request, mecanica)
+
     queryset = filtrar_por_bandeira(
         Lancamento.objects.filter(mecanica=mecanica), bandeira
     )
+    if mes:
+        queryset = queryset.filter(ano_mes=mes)
     dados = calcular_impacto_fabricante(queryset, busca=busca)
     grafico = grafico_mensal(dados['por_mes'], [
         ('venda_base', 'Venda base'), ('venda_oferta', 'Venda oferta'),
@@ -224,13 +251,18 @@ def impacto_fabricante(request, fabricante):
 
     # CMV geral (base + oferta) com/sem verba — com_verba fica None pros 4
     # fabricantes hoje (sem fórmula de apuração ainda, ver PLANO_VERBA.md);
-    # o template mostra "—" em vez de R$0/0% mudo.
+    # o template mostra "—" em vez de R$0/0% mudo. Nas tabelas de loja/
+    # produto usa só a fatia "oferta" (venda_oferta/lucro_oferta) — "base"
+    # não é a promoção, misturar dilui o que a tabela quer mostrar.
     venda_total = dados['kpis']['venda_base'] + dados['kpis']['venda_oferta']
     lucro_total = dados['kpis']['lucro_base'] + dados['kpis']['lucro_oferta']
     dados['kpis']['cmv_pct_sem_verba'] = cmv_pct(venda_total, lucro_total)
     dados['kpis']['cmv_pct_com_verba'] = cmv_pct_com_verba(
-        venda_total, lucro_total, verba_apurada(mecanica)
+        venda_total, lucro_total, verba_apurada(mecanica, mes)
     )
+    anexar_cmv(dados['ranking_lojas'], 'venda_oferta', 'lucro_oferta')
+    anexar_cmv(dados['ranking_bandeiras'], 'venda_oferta', 'lucro_oferta')
+    anexar_cmv(dados['produtos'], 'venda_oferta', 'lucro_oferta')
 
     contexto = {
         'secao': f'fabricante_{fabricante}',
@@ -239,6 +271,8 @@ def impacto_fabricante(request, fabricante):
         'busca': busca,
         'fabricante_chave': fabricante,
         'fabricante_rotulo': rotulo,
+        'meses_disponiveis': meses,
+        'mes_atual': mes,
         'grafico': grafico,
         **dados,
     }
@@ -248,18 +282,27 @@ def impacto_fabricante(request, fabricante):
 def marketing(request):
     bandeira = bandeira_da_request(request)
     busca = request.GET.get('busca', '').strip()
+    meses = meses_disponiveis(Lancamento.MARKETING)
+    mes = mes_da_request(request, Lancamento.MARKETING)
 
     queryset = filtrar_por_bandeira(
         Lancamento.objects.filter(mecanica=Lancamento.MARKETING), bandeira
     )
+    if mes:
+        queryset = queryset.filter(ano_mes=mes)
     dados = calcular_marketing(queryset, busca=busca)
     grafico = grafico_mensal(dados['por_mes'], [('venda', 'Venda'), ('lucro', 'Lucro')])
+    anexar_cmv(dados['ranking_bandeiras'], 'venda', 'lucro')
+    anexar_cmv(dados['por_fabricante'], 'venda', 'lucro')
+    anexar_cmv(dados['produtos'], 'venda', 'lucro')
 
     contexto = {
         'secao': 'marketing',
         'bandeira_atual': bandeira,
         'querystring_extra': querystring_extra(request),
         'busca': busca,
+        'meses_disponiveis': meses,
+        'mes_atual': mes,
         'grafico': grafico,
         **dados,
     }
@@ -269,18 +312,26 @@ def marketing(request):
 def kimberly(request):
     bandeira = bandeira_da_request(request)
     busca = request.GET.get('busca', '').strip()
+    meses = meses_disponiveis(Lancamento.KIMBERLY)
+    mes = mes_da_request(request, Lancamento.KIMBERLY)
 
     queryset = filtrar_por_bandeira(
         Lancamento.objects.filter(mecanica=Lancamento.KIMBERLY), bandeira
     )
+    if mes:
+        queryset = queryset.filter(ano_mes=mes)
     dados = calcular_kimberly(queryset, busca=busca)
     grafico = grafico_mensal(dados['por_mes'], [('venda', 'Venda'), ('lucro', 'Lucro')])
+    anexar_cmv(dados['ranking_bandeiras'], 'venda', 'lucro')
+    anexar_cmv(dados['produtos'], 'venda', 'lucro')
 
     contexto = {
         'secao': 'kimberly',
         'bandeira_atual': bandeira,
         'querystring_extra': querystring_extra(request),
         'busca': busca,
+        'meses_disponiveis': meses,
+        'mes_atual': mes,
         'grafico': grafico,
         **dados,
     }
