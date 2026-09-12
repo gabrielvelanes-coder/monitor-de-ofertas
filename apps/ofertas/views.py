@@ -4,6 +4,7 @@ from django.http import Http404
 from django.shortcuts import render
 
 from apps.lojas.models import Loja
+from apps.verba.services import cmv_pct, cmv_pct_com_verba, verba_apurada
 
 from .models import Lancamento
 from .services import (
@@ -38,8 +39,11 @@ def _resumo_executivo(bandeira, mes=''):
 
     d = calcular_leve3(qs(Lancamento.LEVE3))
     acoes.append({
+        # lucro contábil (sem verba) — a versão "com verba" soma
+        # verba_apurada() logo abaixo, não a margem_ajustada direto, pra
+        # não misturar as duas visões que o Gabriel pediu pra separar.
         'chave': 'leve3', 'rotulo': 'Leve 3 Pague 2', 'url': 'ofertas:leve3',
-        'venda': d['kpis']['venda'], 'lucro': d['kpis']['margem_ajustada'], 'itens': d['kpis']['itens'],
+        'venda': d['kpis']['venda'], 'lucro': d['kpis']['margem_contabil'], 'itens': d['kpis']['itens'],
     })
 
     d = calcular_cestoes(qs(Lancamento.CESTOES))
@@ -74,7 +78,9 @@ def _resumo_executivo(bandeira, mes=''):
     })
 
     for a in acoes:
-        a['cmv_pct'] = (100 - (a['lucro'] / a['venda'] * 100)) if a['venda'] else ZERO
+        a['cmv_pct_sem_verba'] = cmv_pct(a['venda'], a['lucro'])
+        a['verba_apurada'] = verba_apurada(a['chave'], mes)
+        a['cmv_pct_com_verba'] = cmv_pct_com_verba(a['venda'], a['lucro'], a['verba_apurada'])
 
     acoes.sort(key=lambda a: a['venda'], reverse=True)
     return {
