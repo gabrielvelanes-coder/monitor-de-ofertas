@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'apps.lojas',
     'apps.ofertas',
+    'apps.verba',
 ]
 
 MIDDLEWARE = [
