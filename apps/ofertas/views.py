@@ -8,9 +8,10 @@ from apps.lojas.models import Loja
 from .models import Lancamento
 from .services import (
     ACOES_INFO, bandeira_da_request, calcular_cestoes,
-    calcular_impacto_fabricante, calcular_kimberly, calcular_leve3,
-    calcular_marketing, calcular_supracorp, filtrar_por_bandeira,
-    grafico_mensal, meses_disponiveis, querystring_extra,
+    calcular_impacto_fabricante, calcular_impacto_leve3_fabricante,
+    calcular_kimberly, calcular_leve3, calcular_marketing,
+    calcular_supracorp, filtrar_por_bandeira, grafico_mensal,
+    meses_disponiveis, querystring_extra,
 )
 
 ZERO = Decimal('0')
@@ -130,6 +131,7 @@ def leve3(request):
 
     dados = calcular_leve3(queryset, busca=busca)
     grafico = grafico_mensal(dados['por_mes'], [('venda', 'Venda')])
+    impacto_fabricantes = calcular_impacto_leve3_fabricante()
 
     contexto = {
         'secao': 'leve3',
@@ -139,6 +141,7 @@ def leve3(request):
         'fabricante_atual': fabricante,
         'fabricantes_disponiveis': fabricantes_disponiveis,
         'grafico': grafico,
+        'impacto_fabricantes': impacto_fabricantes,
         **dados,
     }
     return render(request, 'ofertas/leve3.html', contexto)

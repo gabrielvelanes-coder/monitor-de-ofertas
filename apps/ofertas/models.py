@@ -23,6 +23,7 @@ class Lancamento(models.Model):
     KIMBERLY = 'kimberly'
     CESTOES = 'cestoes'
     MARKETING = 'marketing'
+    SELLOUT = 'sellout'
     MECANICA_CHOICES = [
         (LEVE3, 'Leve 3 Pague 2'),
         (SUPRACORP, 'Degustação Supra Corp Day'),
@@ -33,6 +34,7 @@ class Lancamento(models.Model):
         (KIMBERLY, 'Ofertas Kimberly'),
         (CESTOES, 'Cestões'),
         (MARKETING, 'Itens do Marketing'),
+        (SELLOUT, 'Sellout Fabricante (referência)'),
     ]
 
     # dentro de uma oferta de fabricante (Kenvue/Principia/Botica/Procter),

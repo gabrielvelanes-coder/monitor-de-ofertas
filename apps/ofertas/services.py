@@ -17,6 +17,9 @@ from collections import defaultdict
 from datetime import date, timedelta
 from decimal import Decimal
 
+from apps.lojas.models import Loja
+
+from .erp import ano_mes_de
 from .models import Lancamento
 
 ZERO = Decimal('0')
@@ -613,6 +616,108 @@ def calcular_kimberly(queryset, busca: str = ''):
         'produtos': produtos,
         'series_produtos': alinhar_com_labels(por_produto_mes, labels),
     }
+
+
+def calcular_impacto_leve3_fabricante():
+    """Impacto do Leve 3 Pague 2 sobre o giro geral do fabricante.
+
+    A oferta roda 1 semana por mês em cada bandeira (semanas diferentes
+    entre Velanes e Ultra Popular — Gabriel confirmou em conversa, não é
+    dado do ERP). Sem um calendário exato de qual semana foi cada mês,
+    a semana da promoção é DETECTADA nos próprios dados: a janela de 7
+    dias corridos com maior giro dos SKUs do Leve 3 daquele fabricante,
+    dentro de cada mês e bandeira. Compara a média diária dessa janela
+    com a média diária do resto do mês, nos mesmos SKUs — heurística,
+    não fórmula validada; o detalhe por mês/janela fica exposto pra
+    conferência.
+
+    Precisa de sellout com data por linha (`manage.py importar_sellout`
+    num arquivo com coluna "Data") — sellout só com "Ano-mês" não entra
+    (não dá pra achar a semana).
+    """
+    fabricantes = sorted(set(
+        Lancamento.objects.filter(mecanica=Lancamento.SELLOUT, data__isnull=False)
+        .values_list('fabricante', flat=True)
+    ))
+
+    resultado = []
+    for fabricante in fabricantes:
+        linha_fabricante = {'fabricante': fabricante, 'bandeiras': []}
+        for bandeira_chave, bandeira_rotulo in Loja.BANDEIRA_CHOICES:
+            skus = set(
+                Lancamento.objects.filter(
+                    mecanica=Lancamento.LEVE3, fabricante=fabricante, loja__bandeira=bandeira_chave,
+                ).values_list('produto_descricao', flat=True).distinct()
+            )
+            if not skus:
+                continue
+
+            linhas = Lancamento.objects.filter(
+                mecanica=Lancamento.SELLOUT, fabricante=fabricante, loja__bandeira=bandeira_chave,
+                produto_descricao__in=skus, data__isnull=False,
+            ).values('data', 'itens')
+
+            por_dia = defaultdict(lambda: ZERO)
+            for linha in linhas:
+                por_dia[linha['data']] += linha['itens'] or ZERO
+            if not por_dia:
+                continue
+
+            por_mes_dias = defaultdict(dict)
+            for dia, itens in por_dia.items():
+                por_mes_dias[ano_mes_de(dia)][dia] = itens
+
+            detalhes_mes = []
+            total_promo_itens, total_promo_dias = ZERO, 0
+            total_resto_itens, total_resto_dias = ZERO, 0
+
+            for mes, dias in sorted(por_mes_dias.items()):
+                datas = sorted(dias.keys())
+                melhor_janela, melhor_soma = None, None
+                for inicio in datas:
+                    fim = inicio + timedelta(days=6)
+                    soma = sum(v for d, v in dias.items() if inicio <= d <= fim)
+                    if melhor_soma is None or soma > melhor_soma:
+                        melhor_soma, melhor_janela = soma, (inicio, fim)
+                if melhor_janela is None:
+                    continue
+
+                ini, fim = melhor_janela
+                dias_promo = [d for d in datas if ini <= d <= fim]
+                dias_resto = [d for d in datas if d not in dias_promo]
+                itens_promo = sum(dias[d] for d in dias_promo)
+                itens_resto = sum(dias[d] for d in dias_resto)
+
+                total_promo_itens += itens_promo
+                total_promo_dias += len(dias_promo)
+                total_resto_itens += itens_resto
+                total_resto_dias += len(dias_resto)
+
+                media_resto_mes = (itens_resto / len(dias_resto)) if dias_resto else ZERO
+                media_promo_mes = (itens_promo / len(dias_promo)) if dias_promo else ZERO
+                detalhes_mes.append({
+                    'mes': mes, 'semana_inicio': ini, 'semana_fim': fim,
+                    'itens_semana': itens_promo,
+                    'media_diaria_semana': media_promo_mes,
+                    'media_diaria_resto': media_resto_mes,
+                    'impacto': (media_promo_mes / media_resto_mes) if media_resto_mes else None,
+                })
+
+            media_promo = (total_promo_itens / total_promo_dias) if total_promo_dias else ZERO
+            media_resto = (total_resto_itens / total_resto_dias) if total_resto_dias else ZERO
+            linha_fabricante['bandeiras'].append({
+                'bandeira': bandeira_rotulo,
+                'skus': len(skus),
+                'media_diaria_semana': media_promo,
+                'media_diaria_resto': media_resto,
+                'impacto': (media_promo / media_resto) if media_resto else None,
+                'meses': detalhes_mes,
+            })
+
+        if linha_fabricante['bandeiras']:
+            resultado.append(linha_fabricante)
+
+    return resultado
 
 
 ACOES_INFO = [

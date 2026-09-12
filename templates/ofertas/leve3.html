@@ -107,6 +107,60 @@
   </tbody>
 </table>
 
+<h3 style="margin-top:24px;">Impacto sobre os fabricantes</h3>
+<p style="color:var(--muted); font-size:12.5px;">
+  Heurística: a "semana da promoção" é detectada automaticamente (janela de 7 dias
+  corridos com maior giro dos SKUs do Leve 3 daquele mês), separado por bandeira —
+  não é um calendário confirmado, confira o detalhe por mês antes de usar pra decisão.
+  Precisa de sellout com data por linha (<code>manage.py importar_sellout</code> com
+  arquivo que tenha coluna "Data"). Setembro está parcial (só até o dia 11).
+</p>
+<table id="tabela-impacto-fabricantes" class="tabela-interativa">
+  <thead>
+    <tr><th>Fabricante</th><th>Bandeira</th><th>SKUs</th><th>Média/dia — semana</th><th>Média/dia — resto do mês</th><th>Impacto</th></tr>
+  </thead>
+  <tbody>
+    {% for fab in impacto_fabricantes %}
+      {% for b in fab.bandeiras %}
+        <tr>
+          <td>{{ fab.fabricante }}</td>
+          <td>{{ b.bandeira }}</td>
+          <td>{{ b.skus }}</td>
+          <td>{{ b.media_diaria_semana|numero:1 }}</td>
+          <td>{{ b.media_diaria_resto|numero:1 }}</td>
+          <td>{% if b.impacto %}{{ b.impacto|numero:2 }}×{% else %}—{% endif %}</td>
+        </tr>
+      {% endfor %}
+    {% empty %}
+      <tr><td colspan="6" class="vazio">Sem sellout com data importado ainda.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+{% for fab in impacto_fabricantes %}
+  {% for b in fab.bandeiras %}
+    <details style="margin-top:10px;">
+      <summary style="cursor:pointer; color:var(--muted); font-size:13px;">{{ fab.fabricante }} — {{ b.bandeira }}: semana detectada por mês</summary>
+      <table class="tabela-interativa" style="margin-top:8px;">
+        <thead>
+          <tr><th>Mês</th><th>Semana detectada</th><th>Itens na semana</th><th>Média/dia resto</th><th>Impacto</th></tr>
+        </thead>
+        <tbody>
+          {% for m in b.meses %}
+            <tr>
+              <td>{{ m.mes }}</td>
+              <td>{{ m.semana_inicio|date:"d/m" }} – {{ m.semana_fim|date:"d/m" }}</td>
+              <td>{{ m.itens_semana|numero }}</td>
+              <td>{{ m.media_diaria_resto|numero:1 }}</td>
+              <td>{% if m.impacto %}{{ m.impacto|numero:2 }}×{% else %}—{% endif %}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </details>
+  {% endfor %}
+{% endfor %}
+
 {% endblock %}
 {% block extra_js %}
 <script>
