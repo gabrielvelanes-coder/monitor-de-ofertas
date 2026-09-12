@@ -10,6 +10,7 @@ from apps.ofertas.erp import (
     ler_relatorio_erp, remover_linha_total,
 )
 from apps.ofertas.models import Lancamento
+from apps.verba.services import sincronizar_verba_leve3
 
 
 class Command(BaseCommand):
@@ -105,6 +106,11 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS(
             f'Leve 3 Pague 2: {total_importados} lançamentos em {len(meses_processados)} '
             f'mês(es) — {resumo_meses}. Fontes: {", ".join(c.name for c in caminhos)}.'
+        ))
+
+        verbas = sincronizar_verba_leve3()
+        self.stdout.write(self.style.SUCCESS(
+            f'Verba: valor_apurado atualizado em {len(verbas)} mês(es) (VerbaMensal, mecânica leve3).'
         ))
         if lojas_sem_cadastro:
             self.stdout.write(self.style.WARNING(
