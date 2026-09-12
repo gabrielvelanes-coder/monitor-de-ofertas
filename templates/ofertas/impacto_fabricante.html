@@ -20,6 +20,8 @@
   <div class="card"><div class="rotulo">Margem base</div><div class="valor">{{ kpis.margem_base_pct|numero:1 }}%</div></div>
   <div class="card"><div class="rotulo">Venda na oferta</div><div class="valor">{{ kpis.venda_oferta|brl }}</div></div>
   <div class="card"><div class="rotulo">Margem na oferta</div><div class="valor">{{ kpis.margem_oferta_pct|numero:1 }}%</div></div>
+  <div class="card"><div class="rotulo">CMV % sem verba</div><div class="valor">{{ kpis.cmv_pct_sem_verba|numero:1 }}%</div></div>
+  <div class="card"><div class="rotulo">CMV % com verba</div><div class="valor">{% if kpis.cmv_pct_com_verba is not None %}{{ kpis.cmv_pct_com_verba|numero:1 }}%{% else %}<span class="vazio" title="Sem fórmula de verba definida ainda">—</span>{% endif %}</div></div>
 </div>
 
 <div class="grafico-card">

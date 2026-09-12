@@ -429,6 +429,7 @@ def calcular_impacto_fabricante(queryset, busca: str = ''):
     kpis = {
         'itens_base': totais[Lancamento.GRUPO_BASE]['itens'],
         'venda_base': totais[Lancamento.GRUPO_BASE]['venda'],
+        'lucro_base': totais[Lancamento.GRUPO_BASE]['lucro'],
         'margem_base_pct': _margem_pct(Lancamento.GRUPO_BASE),
         'itens_oferta': totais[Lancamento.GRUPO_OFERTA]['itens'],
         'venda_oferta': totais[Lancamento.GRUPO_OFERTA]['venda'],

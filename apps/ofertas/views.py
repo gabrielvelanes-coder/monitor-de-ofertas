@@ -222,6 +222,16 @@ def impacto_fabricante(request, fabricante):
         ('venda_base', 'Venda base'), ('venda_oferta', 'Venda oferta'),
     ])
 
+    # CMV geral (base + oferta) com/sem verba — com_verba fica None pros 4
+    # fabricantes hoje (sem fórmula de apuração ainda, ver PLANO_VERBA.md);
+    # o template mostra "—" em vez de R$0/0% mudo.
+    venda_total = dados['kpis']['venda_base'] + dados['kpis']['venda_oferta']
+    lucro_total = dados['kpis']['lucro_base'] + dados['kpis']['lucro_oferta']
+    dados['kpis']['cmv_pct_sem_verba'] = cmv_pct(venda_total, lucro_total)
+    dados['kpis']['cmv_pct_com_verba'] = cmv_pct_com_verba(
+        venda_total, lucro_total, verba_apurada(mecanica)
+    )
+
     contexto = {
         'secao': f'fabricante_{fabricante}',
         'bandeira_atual': bandeira,
