@@ -139,6 +139,14 @@ def leve3(request):
     grafico = grafico_mensal(dados['por_mes'], [('venda', 'Venda')])
     impacto_fabricantes = calcular_impacto_leve3_fabricante()
 
+    # CMV com/sem verba usando o investimento já calculado pro recorte atual
+    # (bandeira/fabricante/busca) — não o agregado de VerbaMensal, que é
+    # sempre "todas as lojas" e não tem como refletir esses filtros.
+    dados['kpis']['cmv_pct_sem_verba'] = cmv_pct(dados['kpis']['venda'], dados['kpis']['margem_contabil'])
+    dados['kpis']['cmv_pct_com_verba'] = cmv_pct_com_verba(
+        dados['kpis']['venda'], dados['kpis']['margem_contabil'], dados['kpis']['investimento']
+    )
+
     contexto = {
         'secao': 'leve3',
         'bandeira_atual': bandeira,
