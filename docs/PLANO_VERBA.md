@@ -1,10 +1,11 @@
 # Plano: Módulo de Verba & Recebimento + CMV com/sem verba
 
-> Planejado em 12/09/26, **ainda não implementado** — Gabriel pediu
-> explicitamente pra só planejar e deixar isso registrado como pendência;
-> a implementação começa quando ele confirmar. Este arquivo é a fonte de
-> verdade do plano (complementa `../Painel_de_Ofertas_Documentacao.docx`,
-> que documenta as regras do painel *antigo* usadas de referência aqui).
+> Planejado em 12/09/26, **implementado no mesmo dia** (Gabriel pediu
+> explicitamente pra começar). As 6 etapas do sequenciamento abaixo foram
+> commitadas uma a uma. Fica como registro histórico da decisão de
+> desenho — o README tem o resumo do estado atual. Este arquivo
+> complementa `../Painel_de_Ofertas_Documentacao.docx`, que documenta as
+> regras do painel *antigo* usadas de referência aqui.
 
 ## Context
 

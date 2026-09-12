@@ -11,8 +11,9 @@ Kimberly · Cestões · Itens do Marketing — todas com importador, tela,
 menu lateral, dashboard executivo e gráficos (Chart.js local, sem CDN).
 Mais uma referência sem tela própria no menu — Sellout (EMS/Eurofarma/
 Germed/Prati, giro completo do fabricante) — usada só pra medir o
-impacto do Leve 3 sobre o fabricante. Sem módulo de verba/recebimento
-nesta primeira versão — só performance (ver "Pendências" abaixo).
+impacto do Leve 3 sobre o fabricante. Módulo de verba/recebimento
+(`apps/verba`) cobre CMV com/sem verba nas 9 ações, mas só Leve 3 tem
+apuração automática validada — ver "Pendências" abaixo.
 
 As regras de negócio (fórmulas, tags de "Cad. Oferta" por mecânica,
 heurística de bandeira) vêm de `../Painel_de_Ofertas_Documentacao.docx`.
@@ -74,15 +75,17 @@ Ofertas Kimberly — todas com importador + tela em `/`.
 
 ## Pendências
 
-- **Controle de verba/recebimento + CMV com/sem verba (2ª etapa) — plano
-  pronto em [`docs/PLANO_VERBA.md`](docs/PLANO_VERBA.md), ainda não
-  implementado.** Decisões já confirmadas com o Gabriel: app novo
-  `apps/verba` (modelo `VerbaMensal`, 1 linha por mecânica+mês); entrada
-  de dado só via Django Admin; CMV "com verba" usa o valor apurado
-  (teórico), não o recebido; as 9 ações devem entrar eventualmente, mas
-  só Leve 3 tem fórmula de apuração validada hoje — as outras 8 ficam
-  como pendência a definir uma a uma. Decisão explícita do Gabriel: só
-  planejar por ora, sem executar.
+- **Controle de verba/recebimento + CMV com/sem verba — implementado
+  (12/09/26)**, plano em [`docs/PLANO_VERBA.md`](docs/PLANO_VERBA.md).
+  App `apps/verba` (modelo `VerbaMensal`, 1 linha por mecânica+mês,
+  entrada só via Django Admin em `/admin/`). Dashboard e as telas de
+  Leve3/fabricante mostram CMV sem verba e com verba lado a lado.
+  **Só Leve 3 tem apuração automática** (`sincronizar_verba_leve3`,
+  chamada a cada `importar_leve3` ou via `manage.py sincronizar_verba`)
+  — as outras 8 ações (Kenvue, Principia, Botica, Procter, Cestões,
+  Marketing, Kimberly, Supracorp) mostram "CMV com verba: —" até
+  alguém cadastrar `valor_apurado` manualmente no admin ou uma fórmula
+  ser definida e validada com o Gabriel, ação por ação.
 - Kimberly: importador aceita curadoria manual (`--produto`/
   `--venda-max`/`--data-inicio`/`--data-fim`), mas a fórmula ainda
   precisa da validação do Gabriel.
