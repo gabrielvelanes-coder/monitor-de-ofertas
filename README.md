@@ -49,6 +49,7 @@ e rode o comando correspondente:
 
 ```
 python manage.py importar_lojas                 # DADOS GRUPO VELANES ATUALIZADO*.xlsx
+python manage.py importar_produtos               # cadastro arvore nova com ean.xlsx (produto -> fabricante)
 python manage.py importar_leve3                  # genericos_<bimestre>_2026.xls (todos em dados/entrada/)
 python manage.py importar_cestoes                # CESTOES*.xls
 python manage.py importar_supracorp              # supracorp day.xls
@@ -66,6 +67,12 @@ duplica lançamento. `importar_marketing` e `importar_kimberly` pedem
 `--help` de cada um pra mais opções, especialmente `importar_kimberly`,
 que precisa de curadoria manual — não existe tag limpa pra promoção
 Hipzinha nos relatórios).
+
+`importar_produtos` roda antes de `importar_leve3` (mas pode rodar
+depois também): `importar_leve3` só lê o cadastro no momento em que roda,
+não fica "escutando" atualização — depois de atualizar o cadastro,
+rodar `importar_leve3` de novo pra refletir nos lançamentos já
+importados.
 
 ## Mecânicas cobertas
 
@@ -89,8 +96,16 @@ Ofertas Kimberly — todas com importador + tela em `/`.
 - Kimberly: importador aceita curadoria manual (`--produto`/
   `--venda-max`/`--data-inicio`/`--data-fim`), mas a fórmula ainda
   precisa da validação do Gabriel.
-- `erp.fabricante_generico()` (Leve 3 por fabricante) hoje é heurística
-  pela sigla no fim do nome do produto (~2,7% não identificado). Gabriel
-  vai mandar uma base de cadastro própria (produto → fabricante) pra
-  substituir a heurística e zerar o "não identificado" — aguardando o
-  arquivo.
+- **Fabricante do Leve 3 — resolvido (12/09/26)** com o cadastro que o
+  Gabriel mandou (`apps/produtos`, `importar_produtos`). 100% dos 150
+  produtos distintos do Leve 3 bateram com o cadastro — zero "não
+  identificado". `erp.fabricante_generico()` (a heurística antiga) virou
+  só fallback pra produto novo fora do cadastro. **Achado ao comparar:**
+  a heurística mapeava errado produtos com sufixo "QUIM" como "Neo
+  Química" — o cadastro mostra que são "U Química" e "Nova Química",
+  fabricantes diferentes; os rótulos EMS/Eurofarma/Germed/Prati foram
+  mantidos iguais de propósito, pra não quebrar o cruzamento com os
+  dados de Sellout já importados (`importar_sellout`, que usa esses
+  mesmos nomes). O segundo arquivo que ele mandou (`cadastro arvore nova
+  com classificacao.xlsx`) não foi usado ainda — tem Classificação por
+  produto, pode servir pra alguma análise futura.

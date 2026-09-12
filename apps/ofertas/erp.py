@@ -126,8 +126,14 @@ _LABORATORIOS_GENERICOS = {
 def fabricante_generico(produto_descricao: str) -> str:
     """Heurística (não é regra validada no docx): o catálogo do ERP termina
     o nome do produto genérico com a sigla do laboratório (ex. "...CPR C/30
-    EMS"). Usada só pra permitir filtrar o Leve 3 Pague 2 por fabricante —
-    quando não reconhece a sigla, devolve 'Não identificado'."""
+    EMS"). Desde 12/09/26, `importar_leve3` usa primeiro o cadastro real
+    (`apps.produtos.services.mapa_fabricantes`, importado do .xlsx que o
+    Gabriel mandou) — esta função só entra como fallback pra produto que
+    não está no cadastro ainda. Chegou a mapear errado pelo menos 2
+    produtos como "Neo Química" que na verdade eram de outro fabricante
+    (token "QUIM" ambíguo) — não confiar nela pra nada que precise de
+    precisão, é só rede de segurança. Quando não reconhece a sigla, devolve
+    'Não identificado'."""
     if not produto_descricao:
         return 'Não identificado'
     ultimo_token = re.sub(r'[^A-Za-zÀ-ÿ]', '', produto_descricao.strip().split()[-1]).upper()

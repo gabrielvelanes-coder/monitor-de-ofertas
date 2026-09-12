@@ -10,6 +10,7 @@ from apps.ofertas.erp import (
     ler_relatorio_erp, remover_linha_total,
 )
 from apps.ofertas.models import Lancamento
+from apps.produtos.services import mapa_fabricantes
 from apps.verba.services import sincronizar_verba_leve3
 
 
@@ -40,6 +41,8 @@ class Command(BaseCommand):
             )
 
         lojas = {loja.codigo: loja for loja in Loja.objects.all()}
+        mapa_fab = mapa_fabricantes()
+        produtos_sem_cadastro = set()
         lojas_sem_cadastro = set()
         total_importados = 0
         meses_processados = {}
@@ -81,11 +84,20 @@ class Command(BaseCommand):
 
                 produto = str(linha[col_produto]).strip()
                 ano_mes = str(linha[col_ano_mes]).strip()
+                fabricante = mapa_fab.get(produto)
+                if fabricante is None:
+                    # Cadastro (apps.produtos) não tem o produto — cai pra
+                    # heurística antiga como rede de segurança, não trava
+                    # o import. Hoje (12/09/26) isso não acontece nenhuma
+                    # vez pro Leve3: os 150 produtos distintos bateram
+                    # 100% com o cadastro que o Gabriel mandou.
+                    fabricante = fabricante_generico(produto)
+                    produtos_sem_cadastro.add(produto)
                 por_mes[ano_mes].append(Lancamento(
                     mecanica=Lancamento.LEVE3,
                     loja=loja,
                     produto_descricao=produto,
-                    fabricante=fabricante_generico(produto),
+                    fabricante=fabricante,
                     ano_mes=ano_mes,
                     itens=linha[col_itens],
                     venda=linha[col_venda],
@@ -116,4 +128,10 @@ class Command(BaseCommand):
             self.stdout.write(self.style.WARNING(
                 f'Lojas sem cadastro (linhas ignoradas): {", ".join(sorted(lojas_sem_cadastro))}. '
                 'Rode importar_lojas primeiro.'
+            ))
+        if produtos_sem_cadastro:
+            self.stdout.write(self.style.WARNING(
+                f'{len(produtos_sem_cadastro)} produto(s) fora do cadastro (apps.produtos) — '
+                'fabricante caiu na heurística antiga, pode aparecer "Não identificado". '
+                'Rode importar_produtos com um cadastro mais recente pra corrigir.'
             ))
