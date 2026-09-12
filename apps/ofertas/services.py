@@ -368,8 +368,9 @@ def calcular_supracorp(queryset):
 
 def calcular_impacto_fabricante(queryset, busca: str = ''):
     """Oferta por fabricante — Kenvue/Principia/Botica/Procter (docx, seção
-    5.3): compara volume/venda/margem "sem desconto" (base) com a promoção
-    do fabricante, mês a mês, por loja/bandeira e por produto."""
+    5.3): compara volume/venda/margem da promoção do fabricante (oferta —
+    tag exata) com todo o resto das vendas dele, incluindo "Sem Desconto"
+    (base), mês a mês, por loja/bandeira e por produto."""
     linhas = queryset.select_related('loja').values(
         'loja_id', 'loja__codigo', 'loja__bandeira', 'produto_descricao',
         'grupo', 'ano_mes', 'itens', 'venda', 'custo', 'lucro',

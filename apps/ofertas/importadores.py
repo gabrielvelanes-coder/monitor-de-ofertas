@@ -1,9 +1,12 @@
 """Lógica de importação compartilhada pelas 4 mecânicas de "impacto por
 fabricante" (Kenvue, Principia, Botica, Procter — docx seção 5.3): cada
-arquivo baseline_<fabricante>_2026.xls traz linhas "Sem Desconto" (base) e
-linhas com a tag de promoção específica do fabricante, misturadas com
-outras tags (outras campanhas do próprio fabricante, "Manual: ...", etc.)
-que não entram na comparação — só base e a tag-alvo exata.
+arquivo baseline_<fabricante>_2026.xls traz linhas com a tag de promoção
+específica do fabricante (grupo oferta — o produto saiu do caderno de
+oferta daquela promoção) e linhas com qualquer outra tag, incluindo "Sem
+Desconto" e outras campanhas do próprio fabricante (grupo base — tudo que
+não é essa promoção específica). Corrigido em 12/09/26: antes a base era
+só "Sem Desconto" e todo o resto (Todo Dia, Cestão, Marketing, etc.) era
+descartado, subestimando a base — ver [[projeto-painel-ofertas]].
 """
 from __future__ import annotations
 
@@ -45,18 +48,19 @@ def importar_relatorio_fabricante(caminho, mecanica: str, tag_alvo: str, fabrica
     lojas = {loja.codigo: loja for loja in Loja.objects.all()}
     lancamentos = []
     lojas_sem_cadastro = set()
-    ignoradas = 0
 
     for _, linha in df.iterrows():
         tag_bruta = str(linha.get(col_tag, '') or '').strip()
         tag_limpa = tag_sem_prefixo(tag_bruta)
-        if tag_limpa.lower() == 'sem desconto':
-            grupo = Lancamento.GRUPO_BASE
-        elif tag_limpa.upper() == tag_alvo.upper():
-            grupo = Lancamento.GRUPO_OFERTA
-        else:
-            ignoradas += 1
-            continue
+        # Oferta = só a tag exata da promoção (saiu do caderno de oferta
+        # daquele fabricante). Base = tudo mais — "Sem Desconto" e qualquer
+        # outra tag/campanha — porque a pergunta de negócio é "o produto
+        # vendeu mais dentro ou fora dessa promoção", não "vendeu mais em
+        # preço cheio ou nesta promoção".
+        grupo = (
+            Lancamento.GRUPO_OFERTA if tag_limpa.upper() == tag_alvo.upper()
+            else Lancamento.GRUPO_BASE
+        )
 
         codigo = codigo_loja(linha[col_loja])
         loja = lojas.get(codigo)
@@ -87,6 +91,5 @@ def importar_relatorio_fabricante(caminho, mecanica: str, tag_alvo: str, fabrica
     return {
         'importados': len(lancamentos),
         'apagados': apagados,
-        'ignoradas': ignoradas,
         'lojas_sem_cadastro': lojas_sem_cadastro,
     }

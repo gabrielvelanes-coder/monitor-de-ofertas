@@ -16,7 +16,7 @@
 {% endif %}
 
 <div class="cards">
-  <div class="card"><div class="rotulo">Venda base (sem desconto)</div><div class="valor">{{ kpis.venda_base|brl }}</div></div>
+  <div class="card"><div class="rotulo">Venda base (fora da oferta)</div><div class="valor">{{ kpis.venda_base|brl }}</div></div>
   <div class="card"><div class="rotulo">Margem base</div><div class="valor">{{ kpis.margem_base_pct|numero:1 }}%</div></div>
   <div class="card"><div class="rotulo">Venda na oferta</div><div class="valor">{{ kpis.venda_oferta|brl }}</div></div>
   <div class="card"><div class="rotulo">Margem na oferta</div><div class="valor">{{ kpis.margem_oferta_pct|numero:1 }}%</div></div>

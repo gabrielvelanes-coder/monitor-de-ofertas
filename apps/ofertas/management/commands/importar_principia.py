@@ -9,9 +9,10 @@ from apps.ofertas.models import Lancamento
 
 class Command(BaseCommand):
     help = (
-        'Importa Ofertas Principia (baseline_principia_2026.xls): compara '
-        'linhas "Sem Desconto" (base) com a tag "PROMOÇÃO PRINCIPIA 15 %" — '
-        'não "OFERTAS PRINCIPIA", mais abrangente (docx, seção 5.3).'
+        'Importa Ofertas Principia (baseline_principia_2026.xls): compara a '
+        'tag "PROMOÇÃO PRINCIPIA 15 %" (oferta) — não "OFERTAS PRINCIPIA", '
+        'mais abrangente — com todo o resto das vendas do fabricante, '
+        'incluindo "Sem Desconto" (base) (docx, seção 5.3).'
     )
 
     def add_arguments(self, parser):
@@ -26,8 +27,7 @@ class Command(BaseCommand):
         )
         self.stdout.write(self.style.SUCCESS(
             f"Principia: {resultado['importados']} lançamentos importados "
-            f"({resultado['apagados']} substituídos, {resultado['ignoradas']} linhas de "
-            f"outras tags ignoradas), fonte {caminho.name}."
+            f"({resultado['apagados']} substituídos), fonte {caminho.name}."
         ))
         if resultado['lojas_sem_cadastro']:
             self.stdout.write(self.style.WARNING(

@@ -9,9 +9,10 @@ from apps.ofertas.models import Lancamento
 
 class Command(BaseCommand):
     help = (
-        'Importa Ofertas Botica (baseline_botica_2026.xls): compara linhas '
-        '"Sem Desconto" (base) com a tag "OFERTA BOTICA NACIONAL" — não '
-        '"OFERTAS BOTICA" nem "OFERTAS BOTICA KIT AG" (docx, seção 5.3).'
+        'Importa Ofertas Botica (baseline_botica_2026.xls): compara a tag '
+        '"OFERTA BOTICA NACIONAL" (oferta) — não "OFERTAS BOTICA" nem '
+        '"OFERTAS BOTICA KIT AG" — com todo o resto das vendas do '
+        'fabricante, incluindo "Sem Desconto" (base) (docx, seção 5.3).'
     )
 
     def add_arguments(self, parser):
@@ -26,8 +27,7 @@ class Command(BaseCommand):
         )
         self.stdout.write(self.style.SUCCESS(
             f"Botica: {resultado['importados']} lançamentos importados "
-            f"({resultado['apagados']} substituídos, {resultado['ignoradas']} linhas de "
-            f"outras tags ignoradas), fonte {caminho.name}."
+            f"({resultado['apagados']} substituídos), fonte {caminho.name}."
         ))
         if resultado['lojas_sem_cadastro']:
             self.stdout.write(self.style.WARNING(
