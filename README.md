@@ -109,6 +109,12 @@ Ofertas Kimberly — todas com importador + tela em `/`.
   - **Supra Corp Day:** nem chegou a ser perguntado ainda — evento
     pontual de degustação, pode ser patrocínio de valor fixo em vez de
     fórmula sobre venda (a decidir quando entrar na fila).
+- **Arquivo de apuração pra enviar à indústria — pendência aberta
+  (13/09/26).** Gabriel quer gerar um Excel (.xlsx) de apuração da
+  oferta pra mandar pra indústria (provavelmente por ação/fabricante —
+  ainda não definido). Ele vai passar o passo a passo (layout, quais
+  ações entram primeiro, campos exatos) antes de começar; formato já
+  confirmado (Excel), resto em aberto.
 - Kimberly: importador aceita curadoria manual (`--produto`/
   `--venda-max`/`--data-inicio`/`--data-fim`), mas a fórmula ainda
   precisa da validação do Gabriel.
