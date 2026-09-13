@@ -85,14 +85,30 @@ Ofertas Kimberly — todas com importador + tela em `/`.
 - **Controle de verba/recebimento + CMV com/sem verba — implementado
   (12/09/26)**, plano em [`docs/PLANO_VERBA.md`](docs/PLANO_VERBA.md).
   App `apps/verba` (modelo `VerbaMensal`, 1 linha por mecânica+mês,
-  entrada só via Django Admin em `/admin/`). Dashboard e as telas de
-  Leve3/fabricante mostram CMV sem verba e com verba lado a lado.
-  **Só Leve 3 tem apuração automática** (`sincronizar_verba_leve3`,
-  chamada a cada `importar_leve3` ou via `manage.py sincronizar_verba`)
-  — as outras 8 ações (Kenvue, Principia, Botica, Procter, Cestões,
-  Marketing, Kimberly, Supracorp) mostram "CMV com verba: —" até
-  alguém cadastrar `valor_apurado` manualmente no admin ou uma fórmula
-  ser definida e validada com o Gabriel, ação por ação.
+  entrada só via Django Admin em `/admin/`). Dashboard e todas as telas
+  de ação (cards + toda tabela de loja/produto/fabricante) mostram CMV
+  sem verba e com verba lado a lado. **Só Leve 3 tem apuração
+  automática** (`sincronizar_verba_leve3`, chamada a cada
+  `importar_leve3` ou via `manage.py sincronizar_verba`) — as outras 8
+  ações mostram "CMV com verba: —" até alguém cadastrar `valor_apurado`
+  manualmente no admin ou uma fórmula ser definida e validada.
+- **Fórmula de verba das outras 8 ações — pendência aberta (13/09/26),
+  aguardando o Gabriel mandar os dados de cada uma.** Pra cada
+  ação/fabricante abaixo falta saber: **base de cálculo** (venda na
+  oferta? desconto dado item a item, como o Leve3? valor fixo por
+  período?), **percentual/valor** e **periodicidade** (mensal? por
+  ciclo/evento?).
+  - **Kenvue / Principia / Botica / Procter:** confirmado com o Gabriel
+    que **cada indústria tem sua própria regra e formato** (não dá pra
+    usar 1 fórmula genérica pras 4, diferente do que se assumiu ao
+    planejar o módulo) — ele vai mandar os dados de cada fabricante.
+  - **Cestões / Itens do Marketing / Kimberly:** ainda não confirmado se
+    essas 3 ações têm verba/reembolso da indústria ou se são só de
+    exposição/giro sem repasse financeiro — pergunta feita ao Gabriel,
+    resposta pendente.
+  - **Supra Corp Day:** nem chegou a ser perguntado ainda — evento
+    pontual de degustação, pode ser patrocínio de valor fixo em vez de
+    fórmula sobre venda (a decidir quando entrar na fila).
 - Kimberly: importador aceita curadoria manual (`--produto`/
   `--venda-max`/`--data-inicio`/`--data-fim`), mas a fórmula ainda
   precisa da validação do Gabriel.
