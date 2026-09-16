@@ -131,3 +131,13 @@ Ofertas Kimberly — todas com importador + tela em `/`.
   mesmos nomes). O segundo arquivo que ele mandou (`cadastro arvore nova
   com classificacao.xlsx`) não foi usado ainda — tem Classificação por
   produto, pode servir pra alguma análise futura.
+- **Backup de código + dado — resolvido (16/09/26).** Repositório não
+  tinha remoto (só commits locais); criado
+  https://github.com/gabrielvelanes-coder/monitor-de-ofertas e enviado
+  todo o histórico. Novo `backup_tudo.py` (`python backup_tudo.py`,
+  roda manual, sem Tarefa Agendada) copia `db.sqlite3` (via backup API
+  do SQLite, seguro com o banco em uso) e tudo em `dados/entrada/`
+  (nunca vão pro Git) pra `OneDrive\Área de Trabalho\BACKUPS DB\
+  painel-ofertas\` — mantém os 10 bancos e as 5 rodadas de dado mais
+  recentes. Mesmo processo já aplicado no Monitor de Preço de Mercado e
+  no Monitor de Perdas no mesmo dia.
