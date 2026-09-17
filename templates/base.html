@@ -139,12 +139,14 @@
               {% endfor %}
             </select>
           {% endif %}
+          {% if not esconder_filtro_bandeira %}
           <label for="bandeira">Bandeira</label>
           <select name="bandeira" id="bandeira" onchange="this.form.submit()">
             <option value="" {% if not bandeira_atual %}selected{% endif %}>Todas</option>
             <option value="velanes" {% if bandeira_atual == 'velanes' %}selected{% endif %}>Velanes</option>
             <option value="ultra_popular" {% if bandeira_atual == 'ultra_popular' %}selected{% endif %}>Ultra Popular</option>
           </select>
+          {% endif %}
         </form>
       </div>
       <main>

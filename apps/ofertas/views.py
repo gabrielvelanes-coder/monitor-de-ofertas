@@ -295,18 +295,19 @@ def impacto_fabricante(request, fabricante):
 
 
 def impacto_promocao(request, promocao):
+    """Deu a Louca e Ultra Queimão já nascem restritas a 1 bandeira cada
+    (Velanes / Ultra Popular) — diferente das outras ações, não faz
+    sentido oferecer o filtro de bandeira nem uma visão "por bandeira"
+    aqui, sempre daria 1 linha só. `filtrar_por_bandeira` não é chamado."""
     if promocao not in PROMOCOES:
         raise Http404('Promoção desconhecida.')
     mecanica, rotulo = PROMOCOES[promocao]
 
-    bandeira = bandeira_da_request(request)
     busca = request.GET.get('busca', '').strip()
     meses = meses_disponiveis(mecanica)
     mes = mes_da_request(request, mecanica)
 
-    queryset = filtrar_por_bandeira(
-        Lancamento.objects.filter(mecanica=mecanica), bandeira
-    )
+    queryset = Lancamento.objects.filter(mecanica=mecanica)
     if mes:
         queryset = queryset.filter(ano_mes=mes)
     dados = calcular_impacto_fabricante(queryset, busca=busca)
@@ -324,12 +325,11 @@ def impacto_promocao(request, promocao):
         venda_total, lucro_total, verba_apurada(mecanica, mes)
     )
     anexar_cmv(dados['ranking_lojas'], 'venda_oferta', 'lucro_oferta')
-    anexar_cmv(dados['ranking_bandeiras'], 'venda_oferta', 'lucro_oferta')
     anexar_cmv(dados['produtos'], 'venda_oferta', 'lucro_oferta')
 
     contexto = {
         'secao': f'promocao_{promocao}',
-        'bandeira_atual': bandeira,
+        'esconder_filtro_bandeira': True,
         'querystring_extra': querystring_extra(request),
         'busca': busca,
         'promocao_chave': promocao,
