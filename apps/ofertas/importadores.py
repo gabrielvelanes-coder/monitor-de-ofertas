@@ -97,6 +97,17 @@ def importar_relatorio_fabricante(caminho, mecanica: str, tag_alvo: str, fabrica
     }
 
 
+# Deu a Louca (Velanes) e Ultra Queimão (Ultra Popular) são a mesma
+# mecânica de negócio (desconto agressivo por quantidade, 1 semana/mês por
+# bandeira, sempre na semana em que a outra bandeira está no Leve3) — só
+# ganharam nomes de cadastro separados no ERP a partir de set/2026. Até
+# ago/2026 as duas bandeiras usavam o mesmo cadastro "ULTRA QUEIMAO
+# SETEMBRO" (nome fixo, não muda com o mês real). Por isso o padrão de tag
+# reconhece as duas grafias em qualquer bandeira — quem decide se a linha
+# é Deu a Louca ou Ultra Queimão é a bandeira da loja, não o texto da tag.
+PADRAO_LOUCA_QUEIMAO = re.compile(r'deu\s+a\s+louca|queim[aã]o', re.IGNORECASE)
+
+
 def importar_promocao_bandeira(
     caminho, mecanica: str, padrao_tag: re.Pattern, bandeira: str,
 ) -> dict:
