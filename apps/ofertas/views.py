@@ -153,7 +153,9 @@ def leve3(request):
         queryset = queryset.filter(ano_mes=mes)
 
     dados = calcular_leve3(queryset, busca=busca)
-    grafico = grafico_mensal(dados['por_mes'], [('venda', 'Venda')])
+    grafico = grafico_mensal(dados['por_mes'], [
+        ('venda', 'Venda'), ('itens', 'Itens', 'unidades'),
+    ])
     impacto_fabricantes = calcular_impacto_leve3_fabricante()
 
     # CMV com/sem verba usando o investimento já calculado pro recorte atual
@@ -195,7 +197,9 @@ def cestoes(request):
     if mes:
         queryset = queryset.filter(ano_mes=mes)
     dados = calcular_cestoes(queryset, busca=busca)
-    grafico = grafico_mensal(dados['por_mes'], [('venda', 'Venda')])
+    grafico = grafico_mensal(dados['por_mes'], [
+        ('venda', 'Venda'), ('itens', 'Itens', 'unidades'),
+    ])
     anexar_cmv(dados['ranking_lojas'], 'venda', 'lucro')
     anexar_cmv(dados['ranking_bandeiras'], 'venda', 'lucro')
     anexar_cmv(dados['produtos'], 'venda', 'lucro')
@@ -262,6 +266,7 @@ def impacto_fabricante(request, fabricante):
     dados = calcular_impacto_fabricante(queryset, busca=busca)
     grafico = grafico_mensal(dados['por_mes'], [
         ('venda_base', 'Venda base'), ('venda_oferta', 'Venda oferta'),
+        ('itens_base', 'Itens base', 'unidades'), ('itens_oferta', 'Itens oferta', 'unidades'),
     ])
 
     # CMV geral (base + oferta) com/sem verba — com_verba fica None pros 4
@@ -313,6 +318,7 @@ def impacto_promocao(request, promocao):
     dados = calcular_impacto_fabricante(queryset, busca=busca)
     grafico = grafico_mensal(dados['por_mes'], [
         ('venda_base', 'Venda base'), ('venda_oferta', 'Venda oferta'),
+        ('itens_base', 'Itens base', 'unidades'), ('itens_oferta', 'Itens oferta', 'unidades'),
     ])
 
     # Mesma decisão de CMV do impacto_fabricante: sem fórmula de verba
@@ -354,7 +360,9 @@ def marketing(request):
     if mes:
         queryset = queryset.filter(ano_mes=mes)
     dados = calcular_marketing(queryset, busca=busca)
-    grafico = grafico_mensal(dados['por_mes'], [('venda', 'Venda'), ('lucro', 'Lucro')])
+    grafico = grafico_mensal(dados['por_mes'], [
+        ('venda', 'Venda'), ('lucro', 'Lucro'), ('itens', 'Itens', 'unidades'),
+    ])
     anexar_cmv(dados['ranking_bandeiras'], 'venda', 'lucro')
     anexar_cmv(dados['por_fabricante'], 'venda', 'lucro')
     anexar_cmv(dados['produtos'], 'venda', 'lucro')
@@ -384,7 +392,9 @@ def kimberly(request):
     if mes:
         queryset = queryset.filter(ano_mes=mes)
     dados = calcular_kimberly(queryset, busca=busca)
-    grafico = grafico_mensal(dados['por_mes'], [('venda', 'Venda'), ('lucro', 'Lucro')])
+    grafico = grafico_mensal(dados['por_mes'], [
+        ('venda', 'Venda'), ('lucro', 'Lucro'), ('itens', 'Itens', 'unidades'),
+    ])
     anexar_cmv(dados['ranking_bandeiras'], 'venda', 'lucro')
     anexar_cmv(dados['produtos'], 'venda', 'lucro')
 

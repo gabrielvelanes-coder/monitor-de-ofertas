@@ -74,11 +74,20 @@ def querystring_extra(request, excluir=('bandeira', 'mes')) -> dict:
 def grafico_mensal(por_mes, campos) -> dict:
     """Converte uma série `por_mes` (lista de dicts com 'ano_mes' + Decimals)
     em {labels, series} pronto pro `graficoLinha`/`graficoBarra` do JS —
-    Decimal não serializa em JSON, então converte pra float aqui."""
+    Decimal não serializa em JSON, então converte pra float aqui.
+
+    `campos` é uma lista de `(chave, rótulo)` ou `(chave, rótulo, eixo)` —
+    `eixo` é 'moeda' (padrão, escala à esquerda em R$) ou 'unidades'
+    (escala à direita, sem grade, pro JS não misturar item com dinheiro
+    numa métrica só)."""
     labels = [item['ano_mes'] for item in por_mes]
     series = [
-        {'label': rotulo, 'data': [float(item.get(chave) or 0) for item in por_mes]}
-        for chave, rotulo in campos
+        {
+            'label': campo[1],
+            'eixo': campo[2] if len(campo) > 2 else 'moeda',
+            'data': [float(item.get(campo[0]) or 0) for item in por_mes],
+        }
+        for campo in campos
     ]
     return {'labels': labels, 'series': series}
 

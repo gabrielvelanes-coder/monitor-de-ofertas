@@ -26,6 +26,12 @@
 
 <div class="grafico-card">
   <h3 style="margin-top:0;">Venda por mês <small style="color:var(--muted); font-weight:400;">— clique num produto embaixo pra ver a série dele</small></h3>
+  {% if grafico.labels|length <= 1 %}
+    <p style="color:var(--muted); font-size:12.5px;">
+      Só há {{ grafico.labels|length }} mês importado — o gráfico vira uma linha de verdade
+      conforme mais arquivos de outros meses forem importados (<code>importar_marketing --arquivo ...</code>).
+    </p>
+  {% endif %}
   <canvas id="grafico-marketing"></canvas>
 </div>
 {{ grafico|json_script:"dados-grafico-marketing" }}
@@ -104,7 +110,9 @@
   var seriesProdutos = JSON.parse(document.getElementById('dados-series-produtos-marketing').textContent);
   var destacarProduto = iniciarDrillDown(chart, seriesProdutos, 'Venda');
   document.querySelectorAll('#tabela-produtos .linha-clicavel').forEach(function (tr) {
-    tr.addEventListener('click', function () { destacarProduto(tr.dataset.produto); });
+    tr.addEventListener('click', function () {
+      tr.classList.toggle('selecionada', destacarProduto(tr.dataset.produto));
+    });
   });
 </script>
 {% endblock %}
