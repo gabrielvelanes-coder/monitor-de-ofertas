@@ -24,6 +24,14 @@ FABRICANTES = {
     'procter': (Lancamento.PROCTER, 'Procter & Gamble'),
 }
 
+# Promoções pontuais restritas a 1 bandeira (Deu a Louca só Velanes, Ultra
+# Queimão só Ultra Popular) — mesma lógica oferta/base de FABRICANTES, mas
+# sem relatório dedicado do ERP ainda (importar_promocao_bandeira).
+PROMOCOES = {
+    'deu_a_louca': (Lancamento.DEU_A_LOUCA, 'Deu a Louca'),
+    'ultra_queimao': (Lancamento.ULTRA_QUEIMAO, 'Ultra Queimão'),
+}
+
 
 def _resumo_executivo(bandeira, mes=''):
     """1 linha por ação, com a fatia de venda/lucro/itens que representa a
@@ -76,6 +84,13 @@ def _resumo_executivo(bandeira, mes=''):
         'chave': 'kimberly', 'rotulo': 'Kimberly', 'url': 'ofertas:kimberly',
         'venda': d['kpis_oferta']['venda'], 'lucro': d['kpis_oferta']['lucro'], 'itens': d['kpis_oferta']['itens'],
     })
+
+    for promo_chave, (mecanica, rotulo) in PROMOCOES.items():
+        d = calcular_impacto_fabricante(qs(mecanica))
+        acoes.append({
+            'chave': promo_chave, 'rotulo': rotulo, 'url': 'ofertas:impacto_promocao', 'url_arg': promo_chave,
+            'venda': d['kpis']['venda_oferta'], 'lucro': d['kpis']['lucro_oferta'], 'itens': d['kpis']['itens_oferta'],
+        })
 
     for a in acoes:
         a['cmv_pct_sem_verba'] = cmv_pct(a['venda'], a['lucro'])
@@ -277,6 +292,54 @@ def impacto_fabricante(request, fabricante):
         **dados,
     }
     return render(request, 'ofertas/impacto_fabricante.html', contexto)
+
+
+def impacto_promocao(request, promocao):
+    if promocao not in PROMOCOES:
+        raise Http404('Promoção desconhecida.')
+    mecanica, rotulo = PROMOCOES[promocao]
+
+    bandeira = bandeira_da_request(request)
+    busca = request.GET.get('busca', '').strip()
+    meses = meses_disponiveis(mecanica)
+    mes = mes_da_request(request, mecanica)
+
+    queryset = filtrar_por_bandeira(
+        Lancamento.objects.filter(mecanica=mecanica), bandeira
+    )
+    if mes:
+        queryset = queryset.filter(ano_mes=mes)
+    dados = calcular_impacto_fabricante(queryset, busca=busca)
+    grafico = grafico_mensal(dados['por_mes'], [
+        ('venda_base', 'Venda base'), ('venda_oferta', 'Venda oferta'),
+    ])
+
+    # Mesma decisão de CMV do impacto_fabricante: sem fórmula de verba
+    # definida ainda pra estas 2 promoções, então com_verba fica None (o
+    # template mostra "—") até alguém apurar isso.
+    venda_total = dados['kpis']['venda_base'] + dados['kpis']['venda_oferta']
+    lucro_total = dados['kpis']['lucro_base'] + dados['kpis']['lucro_oferta']
+    dados['kpis']['cmv_pct_sem_verba'] = cmv_pct(venda_total, lucro_total)
+    dados['kpis']['cmv_pct_com_verba'] = cmv_pct_com_verba(
+        venda_total, lucro_total, verba_apurada(mecanica, mes)
+    )
+    anexar_cmv(dados['ranking_lojas'], 'venda_oferta', 'lucro_oferta')
+    anexar_cmv(dados['ranking_bandeiras'], 'venda_oferta', 'lucro_oferta')
+    anexar_cmv(dados['produtos'], 'venda_oferta', 'lucro_oferta')
+
+    contexto = {
+        'secao': f'promocao_{promocao}',
+        'bandeira_atual': bandeira,
+        'querystring_extra': querystring_extra(request),
+        'busca': busca,
+        'promocao_chave': promocao,
+        'promocao_rotulo': rotulo,
+        'meses_disponiveis': meses,
+        'mes_atual': mes,
+        'grafico': grafico,
+        **dados,
+    }
+    return render(request, 'ofertas/impacto_promocao.html', contexto)
 
 
 def marketing(request):

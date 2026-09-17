@@ -24,6 +24,8 @@ class Lancamento(models.Model):
     CESTOES = 'cestoes'
     MARKETING = 'marketing'
     SELLOUT = 'sellout'
+    DEU_A_LOUCA = 'deu_a_louca'
+    ULTRA_QUEIMAO = 'ultra_queimao'
     MECANICA_CHOICES = [
         (LEVE3, 'Leve 3 Pague 2'),
         (SUPRACORP, 'Degustação Supra Corp Day'),
@@ -35,6 +37,8 @@ class Lancamento(models.Model):
         (CESTOES, 'Cestões'),
         (MARKETING, 'Itens do Marketing'),
         (SELLOUT, 'Sellout Fabricante (referência)'),
+        (DEU_A_LOUCA, 'Deu a Louca (Velanes)'),
+        (ULTRA_QUEIMAO, 'Ultra Queimão (Ultra Popular)'),
     ]
 
     # dentro de uma oferta de fabricante (Kenvue/Principia/Botica/Procter),
