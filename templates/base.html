@@ -100,6 +100,17 @@
     tr.linha-clicavel { cursor: pointer; }
     tr.linha-clicavel:hover { background: var(--accent-bg); }
     tr.linha-clicavel.selecionada { background: var(--accent-bg); box-shadow: inset 3px 0 0 var(--accent); }
+
+    details.secao > summary {
+      cursor: pointer; list-style: none; font-size: 1.17em; font-weight: bold;
+      margin: 1em 0 10px; user-select: none;
+    }
+    details.secao > summary::-webkit-details-marker { display: none; }
+    details.secao > summary::before {
+      content: '▶'; display: inline-block; margin-right: 8px; font-size: 0.7em;
+      transition: transform .15s; color: var(--muted);
+    }
+    details.secao[open] > summary::before { transform: rotate(90deg); }
   </style>
 </head>
 <body>

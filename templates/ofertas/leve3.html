@@ -45,52 +45,54 @@
 {{ grafico|json_script:"dados-grafico-leve3" }}
 {{ series_produtos|json_script:"dados-series-produtos-leve3" }}
 
-<h3>Lojas</h3>
-<div class="abas" style="margin-bottom:10px;">
-  <a href="#" class="ativa" data-grupo="lojas-leve3" data-valor="macro" onclick="alternarPainel(this); return false;">Por bandeira</a>
-  <a href="#" data-grupo="lojas-leve3" data-valor="detalhe" onclick="alternarPainel(this); return false;">Loja a loja</a>
-</div>
-<table data-painel="lojas-leve3" data-valor="macro" class="tabela-interativa">
-  <thead>
-    <tr><th>Bandeira</th><th>Itens</th><th>Venda</th><th>CMV %</th><th>Lucro</th><th>CMV % com verba</th><th>Investimento</th></tr>
-  </thead>
-  <tbody>
-    {% for b in ranking_bandeiras %}
-      <tr>
-        <td>{{ b.bandeira }}</td>
-        <td>{{ b.itens|numero }}</td>
-        <td>{{ b.venda|brl }}</td>
-        <td>{{ b.cmv_pct_sem_verba|numero:1 }}%</td>
-        <td>{{ b.margem_contabil|brl }}</td>
-        <td>{{ b.cmv_pct_com_verba|numero:1 }}%</td>
-        <td>{{ b.investimento|brl }}</td>
-      </tr>
-    {% empty %}
-      <tr><td colspan="7" class="vazio">Sem dados.</td></tr>
-    {% endfor %}
-  </tbody>
-</table>
-<table data-painel="lojas-leve3" data-valor="detalhe" class="tabela-interativa" hidden>
-  <thead>
-    <tr><th>Loja</th><th>Bandeira</th><th>Itens</th><th>Venda</th><th>CMV %</th><th>Lucro</th><th>CMV % com verba</th><th>Investimento</th></tr>
-  </thead>
-  <tbody>
-    {% for l in ranking_lojas %}
-      <tr>
-        <td>{{ l.codigo }}</td>
-        <td>{{ l.bandeira|bandeira_rotulo }}</td>
-        <td>{{ l.itens|numero }}</td>
-        <td>{{ l.venda|brl }}</td>
-        <td>{{ l.cmv_pct_sem_verba|numero:1 }}%</td>
-        <td>{{ l.margem_contabil|brl }}</td>
-        <td>{{ l.cmv_pct_com_verba|numero:1 }}%</td>
-        <td>{{ l.investimento|brl }}</td>
-      </tr>
-    {% empty %}
-      <tr><td colspan="8" class="vazio">Sem dados.</td></tr>
-    {% endfor %}
-  </tbody>
-</table>
+<details class="secao" open>
+  <summary>Lojas</summary>
+  <div class="abas" style="margin-bottom:10px;">
+    <a href="#" class="ativa" data-grupo="lojas-leve3" data-valor="macro" onclick="alternarPainel(this); return false;">Por bandeira</a>
+    <a href="#" data-grupo="lojas-leve3" data-valor="detalhe" onclick="alternarPainel(this); return false;">Loja a loja</a>
+  </div>
+  <table data-painel="lojas-leve3" data-valor="macro" class="tabela-interativa">
+    <thead>
+      <tr><th>Bandeira</th><th>Itens</th><th>Venda</th><th>CMV %</th><th>Lucro</th><th>CMV % com verba</th><th>Investimento</th></tr>
+    </thead>
+    <tbody>
+      {% for b in ranking_bandeiras %}
+        <tr>
+          <td>{{ b.bandeira }}</td>
+          <td>{{ b.itens|numero }}</td>
+          <td>{{ b.venda|brl }}</td>
+          <td>{{ b.cmv_pct_sem_verba|numero:1 }}%</td>
+          <td>{{ b.margem_contabil|brl }}</td>
+          <td>{{ b.cmv_pct_com_verba|numero:1 }}%</td>
+          <td>{{ b.investimento|brl }}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="7" class="vazio">Sem dados.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <table data-painel="lojas-leve3" data-valor="detalhe" class="tabela-interativa" hidden>
+    <thead>
+      <tr><th>Loja</th><th>Bandeira</th><th>Itens</th><th>Venda</th><th>CMV %</th><th>Lucro</th><th>CMV % com verba</th><th>Investimento</th></tr>
+    </thead>
+    <tbody>
+      {% for l in ranking_lojas %}
+        <tr>
+          <td>{{ l.codigo }}</td>
+          <td>{{ l.bandeira|bandeira_rotulo }}</td>
+          <td>{{ l.itens|numero }}</td>
+          <td>{{ l.venda|brl }}</td>
+          <td>{{ l.cmv_pct_sem_verba|numero:1 }}%</td>
+          <td>{{ l.margem_contabil|brl }}</td>
+          <td>{{ l.cmv_pct_com_verba|numero:1 }}%</td>
+          <td>{{ l.investimento|brl }}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="8" class="vazio">Sem dados.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</details>
 
 <h3 style="margin-top:24px;">Produtos participantes</h3>
 <input type="text" id="busca-produto" data-filtro-tabela="tabela-produtos" value="{{ busca }}"

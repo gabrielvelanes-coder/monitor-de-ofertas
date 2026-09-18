@@ -31,26 +31,28 @@
 {{ grafico|json_script:"dados-grafico-promocao" }}
 {{ series_produtos|json_script:"dados-series-produtos-promocao" }}
 
-<h3>Lojas</h3>
-<table class="tabela-interativa">
-  <thead>
-    <tr><th>Loja</th><th>Itens</th><th>Venda</th><th>CMV %</th><th>Lucro</th><th>CMV % com verba</th></tr>
-  </thead>
-  <tbody>
-    {% for l in ranking_lojas %}
-      <tr>
-        <td>{{ l.codigo }}</td>
-        <td>{{ l.itens_oferta|numero }}</td>
-        <td>{{ l.venda_oferta|brl }}</td>
-        <td>{{ l.cmv_pct_sem_verba|numero:1 }}%</td>
-        <td>{{ l.lucro_oferta|brl }}</td>
-        <td>{% if l.cmv_pct_com_verba is not None %}{{ l.cmv_pct_com_verba|numero:1 }}%{% else %}<span class="vazio" title="Sem fórmula de verba definida ainda">—</span>{% endif %}</td>
-      </tr>
-    {% empty %}
-      <tr><td colspan="6" class="vazio">Sem dados.</td></tr>
-    {% endfor %}
-  </tbody>
-</table>
+<details class="secao" open>
+  <summary>Lojas</summary>
+  <table class="tabela-interativa">
+    <thead>
+      <tr><th>Loja</th><th>Itens</th><th>Venda</th><th>CMV %</th><th>Lucro</th><th>CMV % com verba</th></tr>
+    </thead>
+    <tbody>
+      {% for l in ranking_lojas %}
+        <tr>
+          <td>{{ l.codigo }}</td>
+          <td>{{ l.itens_oferta|numero }}</td>
+          <td>{{ l.venda_oferta|brl }}</td>
+          <td>{{ l.cmv_pct_sem_verba|numero:1 }}%</td>
+          <td>{{ l.lucro_oferta|brl }}</td>
+          <td>{% if l.cmv_pct_com_verba is not None %}{{ l.cmv_pct_com_verba|numero:1 }}%{% else %}<span class="vazio" title="Sem fórmula de verba definida ainda">—</span>{% endif %}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="6" class="vazio">Sem dados.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</details>
 
 <h3 style="margin-top:24px;">Produtos na oferta</h3>
 <input type="text" id="busca-produto" data-filtro-tabela="tabela-produtos" value="{{ busca }}"
