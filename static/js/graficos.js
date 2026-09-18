@@ -138,6 +138,13 @@
   // tempo (clicar de novo na mesma linha desmarca só ela). Devolve
   // true/false (ativou/desativou) pra tela colorir a linha da tabela.
   // `seriesPorItem` = {nome: [valores por mês]}.
+  //
+  // O destaque usa uma escala PRÓPRIA (`yDestaque`, escondida) em vez da
+  // escala de moeda do gráfico de fundo: 1 produto/loja é uma fração
+  // pequena do total (venda base/oferta somada), então na mesma escala a
+  // linha destacada ficava achatada perto do zero — parecia que o clique
+  // não fazia nada. Com escala própria, a forma/evolução da linha aparece
+  // de verdade; o valor real (R$) continua certo no tooltip.
   window.iniciarDrillDown = function (chart, seriesPorItem, rotuloMetrica) {
     var ativos = {};
     return function (nome) {
@@ -152,10 +159,13 @@
         return false;
       }
       if (seriesPorItem[nome]) {
+        if (!chart.options.scales.yDestaque) {
+          chart.options.scales.yDestaque = { display: false, beginAtZero: true };
+        }
         var cor = DESTAQUES[Object.keys(ativos).length % DESTAQUES.length];
         var dataset = {
           label: rotulo, data: seriesPorItem[nome],
-          borderColor: cor, backgroundColor: cor, yAxisID: 'y',
+          borderColor: cor, backgroundColor: cor, yAxisID: 'yDestaque',
           borderWidth: 3, tension: 0.25, pointRadius: 4,
         };
         chart.data.datasets.push(dataset);
