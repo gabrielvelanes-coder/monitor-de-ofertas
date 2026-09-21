@@ -24,7 +24,7 @@ from .models import Lancamento
 
 
 def importar_relatorio_fabricante(
-    caminho, mecanica: str, tag_alvo: str, fabricante: str, escopo_delete: str = 'mecanica',
+    caminho, mecanica: str, tag_alvo: str | list[str], fabricante: str, escopo_delete: str = 'mecanica',
 ) -> dict:
     """`escopo_delete='mecanica'` (padrão, Kenvue/Principia/Botica): cada
     import é um baseline completo, apaga a mecânica inteira antes de
@@ -32,7 +32,15 @@ def importar_relatorio_fabricante(
     arquivo -- usado quando a mecânica recebe mais de 1 relatório
     coexistindo (ex. Procter tem a promoção mensal normal + a Semana do
     Cliente, tags e arquivos diferentes, nenhum dos dois é o "todo" da
-    mecânica sozinho)."""
+    mecânica sozinho).
+
+    `tag_alvo`: 1 string (a maioria dos fabricantes) ou uma lista de
+    strings -- Botica tem 3 tags que contam como oferta pro Gabriel
+    ("OFERTA BOTICA NACIONAL"/"OFERTAS BOTICA"/"OFERTAS BOTICA KIT AG",
+    confirmado 22/09/26: a "Nacional" só tinha mecânica de PAGAMENTO/verba
+    diferente por trás, mas as 3 são oferta de verdade pro painel)."""
+    tags_alvo = {tag_alvo.upper()} if isinstance(tag_alvo, str) else {t.upper() for t in tag_alvo}
+
     df, _, _ = ler_relatorio_erp(caminho)
 
     col_loja = coluna(df, 'Cód. Un. Neg.')
@@ -72,7 +80,7 @@ def importar_relatorio_fabricante(
         # vendeu mais dentro ou fora dessa promoção", não "vendeu mais em
         # preço cheio ou nesta promoção".
         grupo = (
-            Lancamento.GRUPO_OFERTA if tag_limpa.upper() == tag_alvo.upper()
+            Lancamento.GRUPO_OFERTA if tag_limpa.upper() in tags_alvo
             else Lancamento.GRUPO_BASE
         )
 
