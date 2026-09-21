@@ -17,12 +17,54 @@ from __future__ import annotations
 
 from decimal import Decimal
 
+import pandas as pd
+
 from apps.produtos.models import Produto, RebaixaProduto
 
 from .erp import tag_sem_prefixo
 from .models import Lancamento
 
 ZERO = Decimal('0')
+
+_COLUNAS_FABRICANTE = {
+    'loja': 'Loja', 'bandeira': 'Bandeira', 'data': 'Data', 'ean': 'EAN',
+    'produto': 'Produto', 'itens': 'Itens', 'venda': 'Venda',
+    'desconto': 'Desconto', 'custo': 'Custo', 'lucro': 'Lucro',
+    'valor_rebaixa_unitario': 'Valor da Rebaixa (R$/un.)',
+    'investimento': 'Investimento (R$)',
+}
+_COLUNAS_LEVE3 = {
+    'loja': 'Loja', 'bandeira': 'Bandeira', 'data': 'Data', 'ano_mes': 'Ano-mês',
+    'produto': 'Produto', 'itens': 'Itens', 'venda': 'Venda', 'custo': 'Custo',
+    'lucro': 'Lucro', 'ciclos': 'Ciclos', 'custo_unitario': 'Custo Unitário (R$)',
+    'investimento': 'Investimento (R$)',
+}
+
+
+def gerar_dataframe_apuracao(mecanica: str, campanha: str | None = None, ano_mes: str | None = None):
+    """Monta os dados (`montar_apuracao_leve3`/`montar_apuracao_industria`,
+    conforme a mecânica) e devolve `(dataframe_pronto_pra_excel, dados)` --
+    usado tanto pelo management command quanto pelo botão de download no
+    painel, pra não duplicar a lógica de renomear coluna/arredondar em 2
+    lugares."""
+    if mecanica == Lancamento.LEVE3:
+        dados = montar_apuracao_leve3(ano_mes=ano_mes)
+        colunas = _COLUNAS_LEVE3
+    else:
+        if not campanha:
+            raise ValueError('campanha é obrigatória pra essa mecânica (só o Leve3 dispensa).')
+        dados = montar_apuracao_industria(mecanica, campanha)
+        colunas = _COLUNAS_FABRICANTE
+
+    df = pd.DataFrame(dados['linhas'])
+    if not df.empty:
+        # Arredonda só aqui, pra exibir -- `dados['total_investimento']`
+        # já foi somado em precisão cheia antes disso (ver comentário em
+        # `montar_apuracao_leve3` sobre a diferença de 7 centavos achada
+        # ao conferir contra o painel).
+        df['investimento'] = df['investimento'].astype(float).round(2)
+    df = df.rename(columns=colunas)
+    return df, dados
 
 
 def montar_apuracao_industria(mecanica: str, campanha: str) -> dict:

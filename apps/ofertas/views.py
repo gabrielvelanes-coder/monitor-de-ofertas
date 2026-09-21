@@ -1,11 +1,13 @@
 from decimal import Decimal
 
-from django.http import Http404
+from django.http import Http404, HttpResponse
 from django.shortcuts import render
 
 from apps.lojas.models import Loja
+from apps.produtos.models import RebaixaProduto
 from apps.verba.services import anexar_cmv, cmv_pct, cmv_pct_com_verba, verba_apurada
 
+from .apuracao import gerar_dataframe_apuracao
 from .erp import tag_sem_prefixo
 from .models import Lancamento
 from .services import (
@@ -272,6 +274,13 @@ def impacto_fabricante(request, fabricante):
     ).exclude(tag_origem='').values_list('tag_origem', flat=True).distinct()
     tem_multiplas_campanhas = len({tag_sem_prefixo(t) for t in tags_brutas}) > 1
 
+    # Botão "Baixar apuração" só aparece pras campanhas que já têm regra de
+    # rebaixa cadastrada (`importar_rebaixas`) -- sem isso o arquivo sairia
+    # com Investimento R$0 em tudo, mais confuso que útil.
+    campanhas_com_rebaixa = list(
+        RebaixaProduto.objects.filter(mecanica=mecanica).values_list('campanha', flat=True).distinct()
+    )
+
     queryset = queryset_sem_mes
     if mes:
         queryset = queryset.filter(ano_mes=mes)
@@ -306,6 +315,7 @@ def impacto_fabricante(request, fabricante):
         'meses_disponiveis': meses,
         'mes_atual': mes,
         'tem_multiplas_campanhas': tem_multiplas_campanhas,
+        'campanhas_com_rebaixa': campanhas_com_rebaixa,
         'grafico': grafico,
         **dados,
     }
@@ -422,3 +432,30 @@ def kimberly(request):
         **dados,
     }
     return render(request, 'ofertas/kimberly.html', contexto)
+
+
+def exportar_apuracao(request, mecanica):
+    """Botão "Baixar apuração" das telas de Leve3/Procter -- mesma lógica
+    do management command `exportar_apuracao_industria`
+    (`gerar_dataframe_apuracao`, compartilhada), só que devolve o .xlsx
+    direto como download em vez de salvar em `dados/saida/`."""
+    campanha = request.GET.get('campanha') or None
+    mes = request.GET.get('mes') or None
+
+    if mecanica != Lancamento.LEVE3 and not campanha:
+        raise Http404('Falta a campanha pra essa mecânica.')
+
+    df, dados = gerar_dataframe_apuracao(mecanica, campanha=campanha, ano_mes=mes)
+    if df.empty:
+        raise Http404('Nenhum lançamento encontrado pra gerar a apuração.')
+
+    nome_arquivo = (
+        f'apuracao_{mecanica}{"_" + mes if mes else ""}.xlsx' if mecanica == Lancamento.LEVE3
+        else f'apuracao_{mecanica}_{campanha.lower().replace(" ", "_")}.xlsx'
+    )
+    resposta = HttpResponse(
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    resposta['Content-Disposition'] = f'attachment; filename="{nome_arquivo}"'
+    df.to_excel(resposta, index=False, sheet_name='Apuração')
+    return resposta

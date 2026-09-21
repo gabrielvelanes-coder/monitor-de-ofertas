@@ -4,9 +4,17 @@
 {% block conteudo %}
 
 <h2>Oferta {{ fabricante_rotulo }}</h2>
+{% if not campanhas_com_rebaixa %}
 <p style="color:var(--muted); font-size:13.5px; margin-top:-8px;">
   Mecânica de verba pendente de definição (docx, seção 5.3) — esta tela mostra só volume/venda/margem.
 </p>
+{% endif %}
+
+{% for c in campanhas_com_rebaixa %}
+  <a class="botao-download" href="{% url 'ofertas:exportar_apuracao' fabricante_chave %}?campanha={{ c|urlencode }}">
+    ⬇ Baixar apuração — {{ c }}
+  </a>
+{% endfor %}
 
 {% if not kpis.venda_oferta and not kpis.venda_base %}
   <div class="aviso">

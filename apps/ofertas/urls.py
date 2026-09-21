@@ -13,4 +13,5 @@ urlpatterns = [
     path('promocao/<str:promocao>/', views.impacto_promocao, name='impacto_promocao'),
     path('marketing/', views.marketing, name='marketing'),
     path('kimberly/', views.kimberly, name='kimberly'),
+    path('apuracao/<str:mecanica>/', views.exportar_apuracao, name='exportar_apuracao'),
 ]

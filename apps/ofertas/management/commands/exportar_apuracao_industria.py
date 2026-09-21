@@ -1,9 +1,8 @@
 from pathlib import Path
 
-import pandas as pd
 from django.core.management.base import BaseCommand, CommandError
 
-from apps.ofertas.apuracao import montar_apuracao_industria, montar_apuracao_leve3
+from apps.ofertas.apuracao import gerar_dataframe_apuracao
 from apps.ofertas.models import Lancamento
 
 
@@ -29,48 +28,27 @@ class Command(BaseCommand):
         mecanica = options['mecanica']
         campanha = options['campanha']
 
-        if mecanica == Lancamento.LEVE3:
-            dados = montar_apuracao_leve3(ano_mes=options['mes'])
-            colunas = {
-                'loja': 'Loja', 'bandeira': 'Bandeira', 'data': 'Data', 'ano_mes': 'Ano-mês',
-                'produto': 'Produto', 'itens': 'Itens', 'venda': 'Venda', 'custo': 'Custo',
-                'lucro': 'Lucro', 'ciclos': 'Ciclos', 'custo_unitario': 'Custo Unitário (R$)',
-                'investimento': 'Investimento (R$)',
-            }
-            identificador = mecanica + (f'_{options["mes"]}' if options['mes'] else '')
-        else:
-            if not campanha:
-                raise CommandError('--campanha é obrigatório pra essa mecânica (só o Leve3 dispensa).')
-            dados = montar_apuracao_industria(mecanica, campanha)
-            colunas = {
-                'loja': 'Loja', 'bandeira': 'Bandeira', 'data': 'Data', 'ean': 'EAN',
-                'produto': 'Produto', 'itens': 'Itens', 'venda': 'Venda',
-                'desconto': 'Desconto', 'custo': 'Custo', 'lucro': 'Lucro',
-                'valor_rebaixa_unitario': 'Valor da Rebaixa (R$/un.)',
-                'investimento': 'Investimento (R$)',
-            }
-            identificador = f'{mecanica}_{campanha.lower().replace(" ", "_")}'
+        if mecanica != Lancamento.LEVE3 and not campanha:
+            raise CommandError('--campanha é obrigatório pra essa mecânica (só o Leve3 dispensa).')
 
-        if not dados['linhas']:
+        df, dados = gerar_dataframe_apuracao(mecanica, campanha=campanha, ano_mes=options['mes'])
+
+        if df.empty:
             raise CommandError(
                 f'Nenhum lançamento encontrado pra [{mecanica}'
                 f'{"/" + campanha if campanha else ""}] -- confira mecânica/campanha/mês.'
             )
 
-        df = pd.DataFrame(dados['linhas'])
-        # Arredonda só aqui, pra exibir -- `total_investimento` (mensagem
-        # abaixo) já foi somado em precisão cheia antes disso, pra bater
-        # com o painel (ver comentário em apuracao.py sobre a diferença de
-        # 7 centavos achada com o Leve3).
-        df['investimento'] = df['investimento'].astype(float).round(2)
-        df = df.rename(columns=colunas)
-
+        identificador = (
+            f'{mecanica}{"_" + options["mes"] if options["mes"] else ""}' if mecanica == Lancamento.LEVE3
+            else f'{mecanica}_{campanha.lower().replace(" ", "_")}'
+        )
         saida = Path(options['saida']) if options['saida'] else Path(f'dados/saida/apuracao_{identificador}.xlsx')
         saida.parent.mkdir(parents=True, exist_ok=True)
         df.to_excel(saida, index=False, sheet_name='Apuração')
 
         self.stdout.write(self.style.SUCCESS(
-            f"Apuração [{mecanica}{'/' + campanha if campanha else ''}]: {len(dados['linhas'])} linhas, "
+            f"Apuração [{mecanica}{'/' + campanha if campanha else ''}]: {len(df)} linhas, "
             f"investimento total R$ {dados['total_investimento']:.2f}, "
             f"salvo em {saida}."
         ))

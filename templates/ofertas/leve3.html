@@ -5,6 +5,10 @@
 
 <h2>Leve 3 Pague 2 <small style="color:var(--muted); font-weight:400;">— genéricos</small></h2>
 
+<a class="botao-download" href="{% url 'ofertas:exportar_apuracao' 'leve3' %}{% if mes_atual %}?mes={{ mes_atual }}{% endif %}">
+  ⬇ Baixar apuração{% if mes_atual %} — {{ mes_atual }}{% else %} — todos os meses{% endif %}
+</a>
+
 {% if not kpis.itens %}
   <div class="aviso">
     Nenhum lançamento importado ainda. Copie <code>LEVE 3 PAGUE 2.xls</code> pra
