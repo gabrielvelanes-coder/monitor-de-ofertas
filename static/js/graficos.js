@@ -145,8 +145,34 @@
   // linha destacada ficava achatada perto do zero — parecia que o clique
   // não fazia nada. Com escala própria, a forma/evolução da linha aparece
   // de verdade; o valor real (R$) continua certo no tooltip.
-  window.iniciarDrillDown = function (chart, seriesPorItem, rotuloMetrica) {
+  // `ocultarBaseEnquantoAtivo`: telas com gráfico de fundo já cheio (4
+  // séries, 2 escalas — ex. impacto por fabricante: venda base/oferta ×
+  // itens base/oferta) ficam ilegíveis com a linha de destaque em cima
+  // (achado real: Gabriel clicou numa campanha e "não consigo entender
+  // nada" — a linha de destaque usa escala própria escondida, então
+  // "sobe" até o topo do gráfico sem relação nenhuma com os números dos
+  // 2 eixos visíveis). Quando `true`, esconde as séries que já existiam
+  // no gráfico ANTES do 1º clique enquanto houver pelo menos 1 item
+  // destacado — volta a mostrar quando desmarcar todos. Telas com
+  // gráfico mais simples (Leve3: só Venda × Itens) não passam esse
+  // parâmetro, mantém o comportamento de sempre.
+  window.iniciarDrillDown = function (chart, seriesPorItem, rotuloMetrica, ocultarBaseEnquantoAtivo) {
     var ativos = {};
+    var qtdSeriesBase = chart.data.datasets.length;
+
+    function atualizarVisibilidadeBase() {
+      if (!ocultarBaseEnquantoAtivo) return;
+      // Lê o tamanho do array inteiro (não só `ativos` deste closure) --
+      // produto e campanha usam `iniciarDrillDown` em separado no mesmo
+      // `chart`; qualquer destaque de qualquer um dos dois soma nele, e a
+      // base só pode voltar a aparecer quando NENHUM dos dois tiver nada
+      // marcado.
+      var algumAtivo = chart.data.datasets.length > qtdSeriesBase;
+      for (var i = 0; i < qtdSeriesBase; i++) {
+        chart.setDatasetVisibility(i, !algumAtivo);
+      }
+    }
+
     return function (nome) {
       var rotulo = maiuscula(rotuloMetrica ? nome + ' — ' + rotuloMetrica : nome);
       if (ativos[nome]) {
@@ -155,6 +181,7 @@
         chart._seriesInfo.splice(i, 1);
         delete ativos[nome];
         chart.options.plugins.legend.display = chart.data.datasets.length > 1;
+        atualizarVisibilidadeBase();
         chart.update();
         return false;
       }
@@ -173,6 +200,7 @@
         ativos[nome] = { dataset: dataset };
       }
       chart.options.plugins.legend.display = true;
+      atualizarVisibilidadeBase();
       chart.update();
       return true;
     };
