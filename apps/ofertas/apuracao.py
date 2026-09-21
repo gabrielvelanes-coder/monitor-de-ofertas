@@ -41,19 +41,46 @@ _COLUNAS_LEVE3 = {
 }
 
 
-def gerar_dataframe_apuracao(mecanica: str, campanha: str | None = None, ano_mes: str | None = None):
+def _slug(texto: str) -> str:
+    """'OFERTAS PROCTER SEMANA DO CLIENTE' -> 'ofertas_procter_semana_do_cliente'."""
+    return texto.strip().lower().replace(' ', '_')
+
+
+def nome_arquivo_apuracao(nome_oferta: str, ano_mes: str | None) -> str:
+    """Convenção pedida pelo Gabriel (22/09): "apuracao_oferta_mes" --
+    `nome_oferta` já vem pronto pra usar (campanha, ou fabricante no caso
+    do Leve3, que precisa de 1 arquivo por fabricante). Sem mês (`ano_mes`
+    omitido) cai pra "todos_os_meses", pra não perder a distinção de quando
+    o arquivo é um recorte único ou o histórico inteiro."""
+    return f'apuracao_{_slug(nome_oferta)}_{ano_mes or "todos_os_meses"}.xlsx'
+
+
+def fabricantes_leve3(ano_mes: str | None = None) -> list[str]:
+    """Fabricantes com lançamento no Leve3 (opcionalmente só 1 mês) --
+    Gabriel pediu o arquivo de apuração separado por fabricante, não 1 só
+    com tudo junto."""
+    queryset = Lancamento.objects.filter(mecanica=Lancamento.LEVE3).exclude(fabricante='')
+    if ano_mes:
+        queryset = queryset.filter(ano_mes=ano_mes)
+    return sorted(queryset.values_list('fabricante', flat=True).distinct())
+
+
+def gerar_dataframe_apuracao(
+    mecanica: str, campanha: str | None = None, ano_mes: str | None = None, fabricante: str | None = None,
+):
     """Monta os dados (`montar_apuracao_leve3`/`montar_apuracao_industria`,
     conforme a mecânica) e devolve `(dataframe_pronto_pra_excel, dados)` --
     usado tanto pelo management command quanto pelo botão de download no
     painel, pra não duplicar a lógica de renomear coluna/arredondar em 2
-    lugares."""
+    lugares. `fabricante` só vale pro Leve3 (Kenvue/Principia/Botica/
+    Procter já são 1 fabricante só por mecânica, não precisa filtrar)."""
     if mecanica == Lancamento.LEVE3:
-        dados = montar_apuracao_leve3(ano_mes=ano_mes)
+        dados = montar_apuracao_leve3(ano_mes=ano_mes, fabricante=fabricante)
         colunas = _COLUNAS_LEVE3
     else:
         if not campanha:
             raise ValueError('campanha é obrigatória pra essa mecânica (só o Leve3 dispensa).')
-        dados = montar_apuracao_industria(mecanica, campanha)
+        dados = montar_apuracao_industria(mecanica, campanha, ano_mes=ano_mes)
         colunas = _COLUNAS_FABRICANTE
 
     df = pd.DataFrame(dados['linhas'])
@@ -67,17 +94,19 @@ def gerar_dataframe_apuracao(mecanica: str, campanha: str | None = None, ano_mes
     return df, dados
 
 
-def montar_apuracao_industria(mecanica: str, campanha: str) -> dict:
+def montar_apuracao_industria(mecanica: str, campanha: str, ano_mes: str | None = None) -> dict:
     """Devolve as linhas de venda da campanha (grupo=oferta) + rebaixa/
     investimento por linha, prontas pra exportar. Resolve o EAN de cada
     produto pelo cadastro (`Produto.descricao` -> `codigo_barras`) e cruza
     com `RebaixaProduto`; quando o cadastro não tem EAN pro produto (achado
     real: acontece, ver commit), cai pro 2º critério — nome do produto
-    batendo exato com `RebaixaProduto.produto_descricao`."""
+    batendo exato com `RebaixaProduto.produto_descricao`. `ano_mes`
+    (opcional, "AAAA-MM") filtra pra 1 mês só; omitido = todos."""
+    queryset = Lancamento.objects.filter(mecanica=mecanica, grupo=Lancamento.GRUPO_OFERTA)
+    if ano_mes:
+        queryset = queryset.filter(ano_mes=ano_mes)
     linhas = list(
-        Lancamento.objects.filter(mecanica=mecanica, grupo=Lancamento.GRUPO_OFERTA)
-        .select_related('loja')
-        .values(
+        queryset.select_related('loja').values(
             'loja__codigo', 'loja__bandeira', 'data', 'ano_mes',
             'produto_descricao', 'tag_origem', 'itens', 'venda', 'desconto',
             'custo', 'lucro',
@@ -133,17 +162,21 @@ def montar_apuracao_industria(mecanica: str, campanha: str) -> dict:
     }
 
 
-def montar_apuracao_leve3(ano_mes: str | None = None) -> dict:
+def montar_apuracao_leve3(ano_mes: str | None = None, fabricante: str | None = None) -> dict:
     """Leve 3 Pague 2 tem fórmula própria automática (docx, seção 5.1/6) --
     não depende de tabela de rebaixa nenhuma, diferente das ofertas de
     fabricante. Mesmo cálculo linha a linha do `calcular_leve3`
     (`services.py`), só que devolvendo cada linha pronta pra exportar em
     vez de já agregada: ciclos = itens // 3; investimento = ciclos ×
     (custo da linha / itens da linha). `ano_mes` (opcional, "AAAA-MM")
-    filtra pra 1 mês só; omitido = todos."""
+    filtra pra 1 mês só; omitido = todos. `fabricante` (opcional, ex.
+    "EMS") -- Gabriel pediu 1 arquivo por fabricante, não 1 só com todos
+    juntos (docx cobre genéricos de vários laboratórios no mesmo Leve3)."""
     queryset = Lancamento.objects.filter(mecanica=Lancamento.LEVE3)
     if ano_mes:
         queryset = queryset.filter(ano_mes=ano_mes)
+    if fabricante:
+        queryset = queryset.filter(fabricante=fabricante)
     linhas = queryset.select_related('loja').values(
         'loja__codigo', 'loja__bandeira', 'data', 'ano_mes',
         'produto_descricao', 'itens', 'venda', 'custo', 'lucro',

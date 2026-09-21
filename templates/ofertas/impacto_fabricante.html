@@ -11,8 +11,8 @@
 {% endif %}
 
 {% for c in campanhas_com_rebaixa %}
-  <a class="botao-download" href="{% url 'ofertas:exportar_apuracao' fabricante_chave %}?campanha={{ c|urlencode }}">
-    ⬇ Baixar apuração — {{ c }}
+  <a class="botao-download" href="{% url 'ofertas:exportar_apuracao' fabricante_chave %}?campanha={{ c|urlencode }}{% if mes_atual %}&mes={{ mes_atual }}{% endif %}">
+    ⬇ Baixar apuração — {{ c }}{% if mes_atual %} ({{ mes_atual }}){% endif %}
   </a>
 {% endfor %}
 

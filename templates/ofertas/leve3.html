@@ -5,9 +5,18 @@
 
 <h2>Leve 3 Pague 2 <small style="color:var(--muted); font-weight:400;">— genéricos</small></h2>
 
-<a class="botao-download" href="{% url 'ofertas:exportar_apuracao' 'leve3' %}{% if mes_atual %}?mes={{ mes_atual }}{% endif %}">
-  ⬇ Baixar apuração{% if mes_atual %} — {{ mes_atual }}{% else %} — todos os meses{% endif %}
-</a>
+<p style="color:var(--muted); font-size:12.5px; margin-bottom:6px;">
+  Apuração por fabricante{% if mes_atual %} — {{ mes_atual }}{% else %} — todos os meses{% endif %}:
+</p>
+<div style="margin-bottom:8px;">
+  {% for fab in fabricantes_disponiveis %}
+    <a class="botao-download" href="{% url 'ofertas:exportar_apuracao' 'leve3' %}?fabricante={{ fab|urlencode }}{% if mes_atual %}&mes={{ mes_atual }}{% endif %}">
+      ⬇ {{ fab }}
+    </a>
+  {% empty %}
+    <span class="vazio">Nenhum fabricante identificado ainda.</span>
+  {% endfor %}
+</div>
 
 {% if not kpis.itens %}
   <div class="aviso">

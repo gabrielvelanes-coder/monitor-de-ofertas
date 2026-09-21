@@ -7,7 +7,7 @@ from apps.lojas.models import Loja
 from apps.produtos.models import RebaixaProduto
 from apps.verba.services import anexar_cmv, cmv_pct, cmv_pct_com_verba, verba_apurada
 
-from .apuracao import gerar_dataframe_apuracao
+from .apuracao import gerar_dataframe_apuracao, nome_arquivo_apuracao
 from .erp import tag_sem_prefixo
 from .models import Lancamento
 from .services import (
@@ -438,21 +438,24 @@ def exportar_apuracao(request, mecanica):
     """Botão "Baixar apuração" das telas de Leve3/Procter -- mesma lógica
     do management command `exportar_apuracao_industria`
     (`gerar_dataframe_apuracao`, compartilhada), só que devolve o .xlsx
-    direto como download em vez de salvar em `dados/saida/`."""
+    direto como download em vez de salvar em `dados/saida/`. Nome do
+    arquivo: "apuracao_<oferta>_<mês>.xlsx" (pedido do Gabriel, 22/09) --
+    `<oferta>` é o fabricante no caso do Leve3 (1 arquivo por fabricante,
+    não 1 só com todos juntos) ou a campanha nas demais."""
     campanha = request.GET.get('campanha') or None
     mes = request.GET.get('mes') or None
+    fabricante = request.GET.get('fabricante') or None
 
     if mecanica != Lancamento.LEVE3 and not campanha:
         raise Http404('Falta a campanha pra essa mecânica.')
+    if mecanica == Lancamento.LEVE3 and not fabricante:
+        raise Http404('Falta o fabricante -- o Leve3 sai separado por fabricante, não 1 arquivo só.')
 
-    df, dados = gerar_dataframe_apuracao(mecanica, campanha=campanha, ano_mes=mes)
+    df, dados = gerar_dataframe_apuracao(mecanica, campanha=campanha, ano_mes=mes, fabricante=fabricante)
     if df.empty:
         raise Http404('Nenhum lançamento encontrado pra gerar a apuração.')
 
-    nome_arquivo = (
-        f'apuracao_{mecanica}{"_" + mes if mes else ""}.xlsx' if mecanica == Lancamento.LEVE3
-        else f'apuracao_{mecanica}_{campanha.lower().replace(" ", "_")}.xlsx'
-    )
+    nome_arquivo = nome_arquivo_apuracao(fabricante if mecanica == Lancamento.LEVE3 else campanha, mes)
     resposta = HttpResponse(
         content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     )
