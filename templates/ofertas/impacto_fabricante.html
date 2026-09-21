@@ -22,6 +22,17 @@
   <div class="card"><div class="rotulo">Margem na oferta</div><div class="valor">{{ kpis.margem_oferta_pct|numero:1 }}%</div></div>
   <div class="card"><div class="rotulo">CMV % sem verba</div><div class="valor">{{ kpis.cmv_pct_sem_verba|numero:1 }}%</div></div>
   <div class="card"><div class="rotulo">CMV % com verba</div><div class="valor">{% if kpis.cmv_pct_com_verba is not None %}{{ kpis.cmv_pct_com_verba|numero:1 }}%{% else %}<span class="vazio" title="Sem fórmula de verba definida ainda">—</span>{% endif %}</div></div>
+  <div class="card">
+    <div class="rotulo">Crescimento na oferta</div>
+    <div class="valor">
+      {% if kpis.crescimento_pct is not None %}
+        {% if kpis.crescimento_pct >= 0 %}+{% endif %}{{ kpis.crescimento_pct|numero:1 }}%
+      {% else %}
+        <span class="vazio" title="Precisa de venda base no mesmo mês da oferta e de dia identificado no relatório (coluna 'Data') pra calcular">—</span>
+      {% endif %}
+    </div>
+    <div style="color:var(--muted); font-size:11px; margin-top:4px;">venda média/dia na oferta vs. venda média/dia sem oferta, mesmo mês</div>
+  </div>
 </div>
 
 <div class="grafico-card">
@@ -110,7 +121,7 @@
        placeholder="Buscar produto… (filtra na hora)" class="campo-busca" style="margin-bottom:10px;">
 <table id="tabela-produtos" class="tabela-interativa">
   <thead>
-    <tr><th>Produto</th><th>Itens</th><th>Venda</th><th>CMV %</th><th>Lucro</th><th>CMV % com verba</th></tr>
+    <tr><th>Produto</th><th>Itens</th><th>Venda</th><th>Crescimento</th><th>CMV %</th><th>Lucro</th><th>CMV % com verba</th></tr>
   </thead>
   <tbody>
     {% for p in produtos %}
@@ -118,12 +129,19 @@
         <td>{{ p.produto }}</td>
         <td>{{ p.itens_oferta|numero }}</td>
         <td>{{ p.venda_oferta|brl }}</td>
+        <td>
+          {% if p.crescimento_pct is not None %}
+            {% if p.crescimento_pct >= 0 %}+{% endif %}{{ p.crescimento_pct|numero:1 }}%
+          {% else %}
+            <span class="vazio" title="Sem venda base no mesmo mês pra comparar">—</span>
+          {% endif %}
+        </td>
         <td>{{ p.cmv_pct_sem_verba|numero:1 }}%</td>
         <td>{{ p.lucro_oferta|brl }}</td>
         <td>{% if p.cmv_pct_com_verba is not None %}{{ p.cmv_pct_com_verba|numero:1 }}%{% else %}<span class="vazio" title="Sem fórmula de verba definida ainda">—</span>{% endif %}</td>
       </tr>
     {% empty %}
-      <tr><td colspan="6" class="vazio">Sem dados.</td></tr>
+      <tr><td colspan="7" class="vazio">Sem dados.</td></tr>
     {% endfor %}
   </tbody>
 </table>
