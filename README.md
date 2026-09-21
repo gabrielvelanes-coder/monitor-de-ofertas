@@ -78,7 +78,12 @@ importados.
 
 Leve 3 Pague 2 · Cestões · Degustação Supra Corp Day · Ofertas Kenvue ·
 Ofertas Principia · Ofertas Botica · Ofertas Procter · Itens do Marketing ·
-Ofertas Kimberly — todas com importador + tela em `/`.
+Ofertas Kimberly · Deu a Louca (Velanes) · Ultra Queimão (Ultra Popular) —
+todas com importador + tela em `/`. Procter pode ter mais de 1 campanha
+rodando no mesmo mês (ex.: promoção mensal + Semana do Cliente) — nesse
+caso a tela de Procter ganha uma seção "Campanhas" separando
+investimento/venda de cada uma (ver `Lancamento.tag_origem` +
+`calcular_impacto_fabricante`, `apps/ofertas/services.py`).
 
 ## Pendências
 
@@ -101,7 +106,13 @@ Ofertas Kimberly — todas com importador + tela em `/`.
   - **Kenvue / Principia / Botica / Procter:** confirmado com o Gabriel
     que **cada indústria tem sua própria regra e formato** (não dá pra
     usar 1 fórmula genérica pras 4, diferente do que se assumiu ao
-    planejar o módulo) — ele vai mandar os dados de cada fabricante.
+    planejar o módulo). **Procter Semana do Cliente — resolvido
+    (21/09/26):** Gabriel mandou `rebaixas_produtos procter.xlsx`
+    (EAN/Produto/Rebaixa, valor fixo em R$ por UNIDADE vendida) — 1ª
+    regra real recebida. Modelo `RebaixaProduto` (`apps/produtos`,
+    escopado por mecânica+campanha), `manage.py importar_rebaixas`. A
+    promoção mensal normal da Procter (tag "PROMOÇÃO PROCTER") e os
+    outros 3 fabricantes ainda não têm regra.
   - **Cestões / Itens do Marketing / Kimberly:** ainda não confirmado se
     essas 3 ações têm verba/reembolso da indústria ou se são só de
     exposição/giro sem repasse financeiro — pergunta feita ao Gabriel,
@@ -109,12 +120,20 @@ Ofertas Kimberly — todas com importador + tela em `/`.
   - **Supra Corp Day:** nem chegou a ser perguntado ainda — evento
     pontual de degustação, pode ser patrocínio de valor fixo em vez de
     fórmula sobre venda (a decidir quando entrar na fila).
-- **Arquivo de apuração pra enviar à indústria — pendência aberta
-  (13/09/26).** Gabriel quer gerar um Excel (.xlsx) de apuração da
-  oferta pra mandar pra indústria (provavelmente por ação/fabricante —
-  ainda não definido). Ele vai passar o passo a passo (layout, quais
-  ações entram primeiro, campos exatos) antes de começar; formato já
-  confirmado (Excel), resto em aberto.
+- **Arquivo de apuração pra enviar à indústria — 1ª implementação real
+  (21/09/26)**, pra Procter Semana do Cliente (única ação com regra de
+  rebaixa cadastrada até agora). `apps/ofertas/apuracao.py`
+  (`montar_apuracao_industria`) + `manage.py exportar_apuracao_industria
+  --mecanica --campanha` gera o `.xlsx`: base = vendas por item da
+  campanha linha a linha (igual ao relatório original) + colunas
+  "Valor da Rebaixa (R$/un.)" e "Investimento (R$)" (itens × rebaixa).
+  EAN resolvido via cadastro de produtos, com fallback por nome exato
+  contra a própria tabela de rebaixa. Testado com dado real: 189
+  linhas, R$ 650,00 de investimento total, 100% das linhas com rebaixa
+  resolvida. **Só roda via management command ainda — sem botão/tela no
+  painel** (avaliar se vale a pena quando a 2ª mecânica com rebaixa
+  chegar). Generaliza pra qualquer mecânica/campanha com
+  `RebaixaProduto` cadastrado, não é específico da Procter.
 - Kimberly: importador aceita curadoria manual (`--produto`/
   `--venda-max`/`--data-inicio`/`--data-fim`), mas a fórmula ainda
   precisa da validação do Gabriel.
