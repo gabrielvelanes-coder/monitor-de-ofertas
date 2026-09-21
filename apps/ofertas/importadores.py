@@ -28,6 +28,7 @@ def importar_relatorio_fabricante(caminho, mecanica: str, tag_alvo: str, fabrica
 
     col_loja = coluna(df, 'Cód. Un. Neg.')
     col_ano_mes = coluna(df, 'Ano-mês')
+    col_data = coluna(df, 'Data')
     col_produto = coluna(df, 'Embalagem')
     col_tag = coluna(df, 'Detalhe Desconto', 'Cad. Oferta')
     col_itens = coluna(df, 'Itens')
@@ -37,15 +38,17 @@ def importar_relatorio_fabricante(caminho, mecanica: str, tag_alvo: str, fabrica
     col_lucro = coluna(df, 'Lucro')
     faltando = [
         nome for nome, col in {
-            'loja': col_loja, 'ano_mes': col_ano_mes, 'produto': col_produto,
+            'loja': col_loja, 'produto': col_produto,
             'tag': col_tag, 'itens': col_itens, 'venda': col_venda,
             'custo': col_custo, 'lucro': col_lucro,
         }.items() if col is None
     ]
     if faltando:
         raise ValueError(f'Colunas não encontradas no arquivo: {", ".join(faltando)}.')
+    if col_ano_mes is None and col_data is None:
+        raise ValueError('Precisa de coluna "Ano-mês" ou "Data" pra determinar o mês.')
 
-    df = remover_linha_total(df, col_ano_mes)
+    df = remover_linha_total(df, col_ano_mes or col_loja)
 
     lojas = {loja.codigo: loja for loja in Loja.objects.all()}
     lancamentos = []
@@ -70,6 +73,14 @@ def importar_relatorio_fabricante(caminho, mecanica: str, tag_alvo: str, fabrica
             lojas_sem_cadastro.add(codigo)
             continue
 
+        if col_ano_mes:
+            ano_mes = str(linha[col_ano_mes]).strip()
+            data_linha = None
+        else:
+            data_linha = linha[col_data]
+            data_linha = data_linha.date() if hasattr(data_linha, 'date') else data_linha
+            ano_mes = ano_mes_de(data_linha)
+
         lancamentos.append(Lancamento(
             mecanica=mecanica,
             loja=loja,
@@ -77,7 +88,8 @@ def importar_relatorio_fabricante(caminho, mecanica: str, tag_alvo: str, fabrica
             fabricante=fabricante,
             tag_origem=tag_bruta,
             grupo=grupo,
-            ano_mes=str(linha[col_ano_mes]).strip(),
+            ano_mes=ano_mes,
+            data=data_linha,
             itens=linha[col_itens],
             venda=linha[col_venda],
             desconto=linha.get(col_desconto) or 0,
