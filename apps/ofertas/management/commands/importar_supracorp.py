@@ -74,8 +74,14 @@ class Command(BaseCommand):
                 arquivo_origem=caminho.name,
             ))
 
+        # Apaga só os meses que ESTE arquivo traz (não a mecânica inteira) --
+        # agora que existe mais de 1 evento Supra Corp Day (1 por mês),
+        # reimportar um mês não pode apagar o histórico dos outros.
+        meses_do_arquivo = {l.ano_mes for l in lancamentos}
         with transaction.atomic():
-            apagados, _ = Lancamento.objects.filter(mecanica=Lancamento.SUPRACORP).delete()
+            apagados, _ = Lancamento.objects.filter(
+                mecanica=Lancamento.SUPRACORP, ano_mes__in=meses_do_arquivo,
+            ).delete()
             Lancamento.objects.bulk_create(lancamentos, batch_size=1000)
 
         self.stdout.write(self.style.SUCCESS(

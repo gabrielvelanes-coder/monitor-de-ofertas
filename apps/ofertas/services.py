@@ -25,11 +25,13 @@ from .models import Lancamento
 ZERO = Decimal('0')
 ROTULOS_BANDEIRA = {'velanes': 'Velanes', 'ultra_popular': 'Ultra Popular'}
 
-# Evento pontual de degustação Supra Corp Day (docx, seção 5.2) — data fixa,
-# não um padrão recorrente. Se um novo evento acontecer, este valor (e o
-# import) precisam ser atualizados/generalizados.
-EVENTO_SUPRACORP = date(2026, 8, 5)
-JANELA_SUPRACORP = {EVENTO_SUPRACORP, EVENTO_SUPRACORP + timedelta(days=1)}
+# Evento pontual de degustação Supra Corp Day (docx, seção 5.2) — 1 janela
+# por mês (dia do evento, +1 dia quando durou 2 dias), não um padrão
+# recorrente. Acrescentar aqui quando um novo evento acontecer.
+JANELAS_SUPRACORP = {
+    '2026-08': {date(2026, 8, 5), date(2026, 8, 5) + timedelta(days=1)},
+    '2026-09': {date(2026, 9, 4)},
+}
 
 
 def bandeira_da_request(request) -> str:
@@ -297,8 +299,11 @@ def calcular_supracorp(queryset):
         'data', 'itens', 'venda',
     ))
 
-    dias_no_mes = calendar.monthrange(EVENTO_SUPRACORP.year, EVENTO_SUPRACORP.month)[1]
-    dias_resto = dias_no_mes - len(JANELA_SUPRACORP)
+    # "dias_resto" precisa somar o mês inteiro de CADA evento presente nos
+    # dados (não só um mês fixo) -- só sei quais meses estão presentes depois
+    # de rodar o loop abaixo, por isso é calculado depois, não antes.
+    meses_presentes = set()
+    janelas_presentes = set()
 
     por_dia = defaultdict(lambda: {'itens': ZERO, 'venda': ZERO})
     por_loja = defaultdict(lambda: {
@@ -319,8 +324,11 @@ def calcular_supracorp(queryset):
             continue
         itens = linha['itens'] or ZERO
         venda = linha['venda'] or ZERO
-        na_janela = data in JANELA_SUPRACORP
         ano_mes = f'{data.year:04d}-{data.month:02d}'
+        na_janela = data in JANELAS_SUPRACORP.get(ano_mes, set())
+        meses_presentes.add(ano_mes)
+        if na_janela:
+            janelas_presentes.add(data)
 
         dia = por_dia[data]
         dia['itens'] += itens
@@ -344,6 +352,11 @@ def calcular_supracorp(queryset):
             loja['itens_resto'] += itens
             bandeira_raw['itens_resto'] += itens
             por_produto_mes[linha['produto_descricao']][ano_mes] += itens
+
+    dias_resto = sum(
+        calendar.monthrange(int(am[:4]), int(am[5:7]))[1] - len(JANELAS_SUPRACORP.get(am, set()))
+        for am in meses_presentes
+    )
 
     media_diaria_geral = (total_itens_resto / dias_resto) if dias_resto else ZERO
     impacto_geral = (total_itens_evento / media_diaria_geral) if media_diaria_geral else None
@@ -371,7 +384,7 @@ def calcular_supracorp(queryset):
     produtos = [{'produto': nome, **valores} for nome, valores in produtos]
 
     serie_diaria = [
-        {'data': dia, 'na_janela': dia in JANELA_SUPRACORP, **valores}
+        {'data': dia, 'na_janela': dia in janelas_presentes, **valores}
         for dia, valores in sorted(por_dia.items())
     ]
 
@@ -386,7 +399,10 @@ def calcular_supracorp(queryset):
         'ranking_lojas': ranking_lojas,
         'ranking_bandeiras': ranking_bandeiras,
         'produtos': produtos,
-        'evento_data': EVENTO_SUPRACORP,
+        # 1 evento (mais comum, filtro de mês ativo) -> data única, igual
+        # antes. Vários (ex. "todos os meses" com 2 eventos) -> lista, o
+        # template decide como mostrar.
+        'eventos_datas': sorted(janelas_presentes),
     }
 
 

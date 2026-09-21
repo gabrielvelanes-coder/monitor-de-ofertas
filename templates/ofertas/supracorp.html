@@ -3,7 +3,15 @@
 {% block title %}Supra Corp Day{% endblock %}
 {% block conteudo %}
 
-<h2>Degustação Supra Corp Day <small style="color:var(--muted); font-weight:400;">— evento de {{ evento_data|date:"d/m/Y" }}</small></h2>
+<h2>Degustação Supra Corp Day
+  <small style="color:var(--muted); font-weight:400;">
+    {% if eventos_datas|length == 1 %}
+      — evento de {{ eventos_datas.0|date:"d/m/Y" }}
+    {% elif eventos_datas %}
+      — eventos de {% for d in eventos_datas %}{{ d|date:"d/m/Y" }}{% if not forloop.last %}, {% endif %}{% endfor %}
+    {% endif %}
+  </small>
+</h2>
 
 {% if not kpis.itens_evento %}
   <div class="aviso">
