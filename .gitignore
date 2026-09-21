@@ -5,5 +5,7 @@ db.sqlite3
 db.sqlite3.bak*
 dados/entrada/*
 !dados/entrada/.gitkeep
+dados/saida/*
+!dados/saida/.gitkeep
 *.log
 .DS_Store
