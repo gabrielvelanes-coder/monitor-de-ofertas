@@ -108,7 +108,7 @@
 {% block extra_js %}
 <script>
   var dados = JSON.parse(document.getElementById('dados-grafico-cestoes').textContent);
-  var chart = graficoLinha('grafico-cestoes', dados.labels, dados.series);
+  var chart = graficoBarra('grafico-cestoes', dados.labels, dados.series);
   ativarCliqueMes(chart, dados.labels);
   var seriesProdutos = JSON.parse(document.getElementById('dados-series-produtos-cestoes').textContent);
   var destacarProduto = iniciarDrillDown(chart, seriesProdutos, 'Venda');

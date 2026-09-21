@@ -191,6 +191,11 @@
         }
         var cor = DESTAQUES[Object.keys(ativos).length % DESTAQUES.length];
         var dataset = {
+          // `type: 'line'` explícito -- o gráfico de fundo virou barra
+          // (22/09/26), sem isso o destaque nasceria como barra também
+          // (Chart.js segue o tipo do gráfico quando o dataset não diz o
+          // seu próprio), ficando confuso em cima de outras barras.
+          type: 'line',
           label: rotulo, data: seriesPorItem[nome],
           borderColor: cor, backgroundColor: cor, yAxisID: 'yDestaque',
           borderWidth: 3, tension: 0.25, pointRadius: 4,

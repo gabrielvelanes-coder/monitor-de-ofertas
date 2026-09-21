@@ -106,7 +106,7 @@
 {% block extra_js %}
 <script>
   var dados = JSON.parse(document.getElementById('dados-grafico-marketing').textContent);
-  var chart = graficoLinha('grafico-marketing', dados.labels, dados.series);
+  var chart = graficoBarra('grafico-marketing', dados.labels, dados.series);
   ativarCliqueMes(chart, dados.labels);
   var seriesProdutos = JSON.parse(document.getElementById('dados-series-produtos-marketing').textContent);
   var destacarProduto = iniciarDrillDown(chart, seriesProdutos, 'Venda');

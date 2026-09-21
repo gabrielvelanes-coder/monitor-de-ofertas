@@ -106,7 +106,7 @@
 {% block extra_js %}
 <script>
   var dados = JSON.parse(document.getElementById('dados-grafico-kimberly').textContent);
-  var chart = graficoLinha('grafico-kimberly', dados.labels, dados.series);
+  var chart = graficoBarra('grafico-kimberly', dados.labels, dados.series);
   ativarCliqueMes(chart, dados.labels);
   var seriesProdutos = JSON.parse(document.getElementById('dados-series-produtos-kimberly').textContent);
   var destacarProduto = iniciarDrillDown(chart, seriesProdutos, 'Venda');
