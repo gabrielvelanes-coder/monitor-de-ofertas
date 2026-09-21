@@ -70,6 +70,19 @@
         <tr><td colspan="7" class="vazio">Sem dados.</td></tr>
       {% endfor %}
     </tbody>
+    {% if kpis.itens %}
+      <tfoot>
+        <tr class="linha-total">
+          <td>TOTAL</td>
+          <td>{{ kpis.itens|numero }}</td>
+          <td>{{ kpis.venda|brl }}</td>
+          <td>{{ kpis.cmv_pct_sem_verba|numero:1 }}%</td>
+          <td>{{ kpis.margem_contabil|brl }}</td>
+          <td>{{ kpis.cmv_pct_com_verba|numero:1 }}%</td>
+          <td>{{ kpis.investimento|brl }}</td>
+        </tr>
+      </tfoot>
+    {% endif %}
   </table>
   <table data-painel="lojas-leve3" data-valor="detalhe" class="tabela-interativa" hidden>
     <thead>
@@ -91,6 +104,20 @@
         <tr><td colspan="8" class="vazio">Sem dados.</td></tr>
       {% endfor %}
     </tbody>
+    {% if kpis.itens %}
+      <tfoot>
+        <tr class="linha-total">
+          <td>TOTAL</td>
+          <td></td>
+          <td>{{ kpis.itens|numero }}</td>
+          <td>{{ kpis.venda|brl }}</td>
+          <td>{{ kpis.cmv_pct_sem_verba|numero:1 }}%</td>
+          <td>{{ kpis.margem_contabil|brl }}</td>
+          <td>{{ kpis.cmv_pct_com_verba|numero:1 }}%</td>
+          <td>{{ kpis.investimento|brl }}</td>
+        </tr>
+      </tfoot>
+    {% endif %}
   </table>
 </details>
 
