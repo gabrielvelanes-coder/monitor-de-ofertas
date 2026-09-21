@@ -65,6 +65,8 @@
 {{ grafico|json_script:"dados-grafico-leve3" }}
 {{ series_produtos|json_script:"dados-series-produtos-leve3" }}
 
+{% include "ofertas/_grafico_semanal.html" with id_semanal="leve3" id_dados_semanal="dados-semanas-leve3" %}
+
 <details class="secao" open>
   <summary>Lojas</summary>
   <div class="abas" style="margin-bottom:10px;">
@@ -233,5 +235,10 @@
       tr.classList.toggle('selecionada', destacarProduto(tr.dataset.produto));
     });
   });
+
+  var dadosSemanas = document.getElementById('dados-semanas-leve3');
+  if (dadosSemanas) {
+    graficoBarraSemanal('grafico-semanal-leve3', JSON.parse(dadosSemanas.textContent));
+  }
 </script>
 {% endblock %}

@@ -57,6 +57,8 @@
 {{ grafico|json_script:"dados-grafico-fabricante" }}
 {{ series_produtos|json_script:"dados-series-produtos-fabricante" }}
 
+{% include "ofertas/_grafico_semanal.html" with id_semanal="fabricante" id_dados_semanal="dados-semanas-fabricante" %}
+
 {% if tem_multiplas_campanhas %}
 <details class="secao" open>
   <summary>Campanhas</summary>
@@ -184,6 +186,11 @@
         tr.classList.toggle('selecionada', destacarCampanha(tr.dataset.campanha));
       });
     });
+  }
+
+  var dadosSemanas = document.getElementById('dados-semanas-fabricante');
+  if (dadosSemanas) {
+    graficoBarraSemanal('grafico-semanal-fabricante', JSON.parse(dadosSemanas.textContent));
   }
 </script>
 {% endblock %}

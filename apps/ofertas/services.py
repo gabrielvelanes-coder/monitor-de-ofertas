@@ -423,6 +423,78 @@ def _meses_antes(ano_mes: str, quantos: int) -> list[str]:
     return meses
 
 
+def serie_semanal(queryset, mes: str | None = None):
+    """Venda por semana (segunda a domingo), com as semanas que tiveram
+    alguma linha `grupo=oferta` marcadas como destaque + % de crescimento
+    vs. a média das semanas sem oferta (pedido 22/09/26 -- ver preview
+    aprovado: "quero VER no gráfico o impacto"). Reaproveitável por
+    qualquer mecânica que tenha `data` preenchida (fabricantes, Kimberly,
+    Leve3, Deu a Louca/Ultra Queimão) -- linha sem `data` (relatório
+    agregado por "Ano-mês") não entra, não dá pra saber a semana dela.
+
+    `queryset` deve vir SEM filtro de mês (achado real: filtrar por mês
+    antes de chamar aqui corta ao meio uma semana que cruza a virada do
+    mês -- Kimberly mostrou -78% numa semana que só tinha 2 dos 7 dias
+    contados, o resto tinha caído no mês anterior e ficou de fora). `mes`
+    (opcional, "AAAA-MM") só filtra quais semanas aparecem no RESULTADO —
+    a média/baseline usa todas as semanas disponíveis no queryset, não só
+    as do mês exibido (mais dado, comparação mais robusta, mesma lógica já
+    usada no "crescimento" dos KPIs com os 3 meses antes)."""
+    linhas = list(queryset.exclude(data=None).values('data', 'grupo', 'venda'))
+    if not linhas:
+        return {'semanas': []}
+
+    data_max = max(l['data'] for l in linhas)
+
+    por_semana = defaultdict(lambda: {'venda': ZERO, 'tem_oferta': False, 'inicio': None, 'fim': None})
+    for l in linhas:
+        data = l['data']
+        segunda = data - timedelta(days=data.weekday())
+        chave = segunda.isoformat()
+        s = por_semana[chave]
+        s['inicio'] = segunda
+        s['fim'] = segunda + timedelta(days=6)
+        s['venda'] += l['venda'] or ZERO
+        if l['grupo'] == Lancamento.GRUPO_OFERTA:
+            s['tem_oferta'] = True
+
+    semanas = [v for _, v in sorted(por_semana.items())]
+    # A última semana pode estar pela metade (dado só vai até `data_max`,
+    # não até domingo) -- contar ela como "semana normal" na média, ou
+    # dar % de crescimento nela, compararia 7 dias de verdade contra menos
+    # de 7 dias, dado errado disfarçado de real (achado ao testar: mostrou
+    # "-87%" numa semana que só tinha 1 dia de dado ainda, não é queda
+    # nenhuma). Fica marcada `parcial`, fora da média e sem % nenhum.
+    for s in semanas:
+        s['parcial'] = s['fim'] > data_max
+
+    vendas_baseline = [s['venda'] for s in semanas if not s['tem_oferta'] and not s['parcial']]
+    media_baseline = (sum(vendas_baseline, ZERO) / len(vendas_baseline)) if vendas_baseline else None
+
+    # `inicio`/`fim` viram string ISO e `venda`/`crescimento_pct` viram
+    # float aqui -- mesmo padrão do `grafico_mensal` (Decimal/date não
+    # passam direto pro `json_script` do template sem virar string).
+    semanas_json = []
+    for s in semanas:
+        crescimento_pct = (
+            float((s['venda'] / media_baseline - 1) * 100)
+            if s['tem_oferta'] and not s['parcial'] and media_baseline else None
+        )
+        semanas_json.append({
+            'inicio': s['inicio'].isoformat(),
+            'fim': s['fim'].isoformat(),
+            'venda': float(s['venda']),
+            'tem_oferta': s['tem_oferta'],
+            'parcial': s['parcial'],
+            'crescimento_pct': crescimento_pct,
+        })
+
+    if mes:
+        semanas_json = [s for s in semanas_json if s['inicio'][:7] == mes or s['fim'][:7] == mes]
+
+    return {'semanas': semanas_json}
+
+
 def calcular_impacto_fabricante(queryset, busca: str = '', queryset_baseline=None):
     """Oferta por fabricante — Kenvue/Principia/Botica/Procter (docx, seção
     5.3): compara volume/venda/margem da promoção do fabricante (oferta —

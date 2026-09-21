@@ -15,7 +15,7 @@ from .services import (
     calcular_impacto_fabricante, calcular_impacto_leve3_fabricante,
     calcular_kimberly, calcular_leve3, calcular_marketing,
     calcular_supracorp, filtrar_por_bandeira, grafico_mensal,
-    mes_da_request, meses_disponiveis, querystring_extra,
+    mes_da_request, meses_disponiveis, querystring_extra, serie_semanal,
 )
 
 ZERO = Decimal('0')
@@ -152,6 +152,7 @@ def leve3(request):
     )
     if fabricante:
         queryset = queryset.filter(fabricante=fabricante)
+    queryset_sem_mes = queryset
     if mes:
         queryset = queryset.filter(ano_mes=mes)
 
@@ -159,6 +160,12 @@ def leve3(request):
     grafico = grafico_mensal(dados['por_mes'], [
         ('venda', 'Venda'), ('itens', 'Itens', 'unidades'),
     ])
+    # Leve3 não tem `grupo` preenchido (só importa a venda que já é a
+    # própria oferta, sem contraparte "base" pra comparar) -- as barras
+    # saem todas sem destaque/%, mas ainda mostram a venda por semana (útil
+    # pra ver em qual semana cada bandeira rodou o combo, já que Velanes e
+    # Ultra Popular giram em semanas diferentes).
+    semanas = serie_semanal(queryset_sem_mes, mes)['semanas']
     impacto_fabricantes = calcular_impacto_leve3_fabricante()
 
     # CMV com/sem verba usando o investimento já calculado pro recorte atual
@@ -182,6 +189,7 @@ def leve3(request):
         'meses_disponiveis': meses,
         'mes_atual': mes,
         'grafico': grafico,
+        'semanas': semanas,
         'impacto_fabricantes': impacto_fabricantes,
         **dados,
     }
@@ -289,6 +297,7 @@ def impacto_fabricante(request, fabricante):
         ('venda_base', 'Venda base'), ('venda_oferta', 'Venda oferta'),
         ('itens_base', 'Itens base', 'unidades'), ('itens_oferta', 'Itens oferta', 'unidades'),
     ])
+    semanas = serie_semanal(queryset_sem_mes, mes)['semanas']
 
     # CMV geral (base + oferta) com/sem verba — com_verba fica None pros 4
     # fabricantes hoje (sem fórmula de apuração ainda, ver PLANO_VERBA.md);
@@ -317,6 +326,7 @@ def impacto_fabricante(request, fabricante):
         'tem_multiplas_campanhas': tem_multiplas_campanhas,
         'campanhas_com_rebaixa': campanhas_com_rebaixa,
         'grafico': grafico,
+        'semanas': semanas,
         **dados,
     }
     return render(request, 'ofertas/impacto_fabricante.html', contexto)
@@ -335,7 +345,8 @@ def impacto_promocao(request, promocao):
     meses = meses_disponiveis(mecanica)
     mes = mes_da_request(request, mecanica)
 
-    queryset = Lancamento.objects.filter(mecanica=mecanica)
+    queryset_sem_mes = Lancamento.objects.filter(mecanica=mecanica)
+    queryset = queryset_sem_mes
     if mes:
         queryset = queryset.filter(ano_mes=mes)
     dados = calcular_impacto_fabricante(queryset, busca=busca)
@@ -343,6 +354,7 @@ def impacto_promocao(request, promocao):
         ('venda_base', 'Venda base'), ('venda_oferta', 'Venda oferta'),
         ('itens_base', 'Itens base', 'unidades'), ('itens_oferta', 'Itens oferta', 'unidades'),
     ])
+    semanas = serie_semanal(queryset_sem_mes, mes)['semanas']
 
     # Mesma decisão de CMV do impacto_fabricante: sem fórmula de verba
     # definida ainda pra estas 2 promoções, então com_verba fica None (o
@@ -366,6 +378,7 @@ def impacto_promocao(request, promocao):
         'meses_disponiveis': meses,
         'mes_atual': mes,
         'grafico': grafico,
+        'semanas': semanas,
         **dados,
     }
     return render(request, 'ofertas/impacto_promocao.html', contexto)
@@ -409,15 +422,17 @@ def kimberly(request):
     meses = meses_disponiveis(Lancamento.KIMBERLY)
     mes = mes_da_request(request, Lancamento.KIMBERLY)
 
-    queryset = filtrar_por_bandeira(
+    queryset_sem_mes = filtrar_por_bandeira(
         Lancamento.objects.filter(mecanica=Lancamento.KIMBERLY), bandeira
     )
+    queryset = queryset_sem_mes
     if mes:
         queryset = queryset.filter(ano_mes=mes)
     dados = calcular_kimberly(queryset, busca=busca)
     grafico = grafico_mensal(dados['por_mes'], [
         ('venda', 'Venda'), ('lucro', 'Lucro'), ('itens', 'Itens', 'unidades'),
     ])
+    semanas = serie_semanal(queryset_sem_mes, mes)['semanas']
     anexar_cmv(dados['ranking_bandeiras'], 'venda', 'lucro')
     anexar_cmv(dados['produtos'], 'venda', 'lucro')
 
@@ -429,6 +444,7 @@ def kimberly(request):
         'meses_disponiveis': meses,
         'mes_atual': mes,
         'grafico': grafico,
+        'semanas': semanas,
         **dados,
     }
     return render(request, 'ofertas/kimberly.html', contexto)

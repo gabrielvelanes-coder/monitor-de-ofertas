@@ -246,4 +246,76 @@
     chart._seriesInfo = seriesInfo;
     return chart;
   };
+
+  // Venda por semana, semana(s) com oferta destacada + % de crescimento
+  // escrito em cima da barra (pedido 22/09/26 -- "preciso VER no gráfico
+  // o impacto, o realizado"; preview aprovado comparando com o gráfico de
+  // linha mensal de sempre). `semanas` = lista de {inicio, fim, venda,
+  // tem_oferta, crescimento_pct}, já vem pronta do back-end
+  // (`serie_semanal`, services.py) -- aqui só desenha.
+  var COR_NORMAL = '#5b8def', COR_DESTAQUE = '#e8628f';
+
+  function rotuloSemana(semana) {
+    var d = new Date(semana.inicio + 'T00:00:00');
+    return (d.getDate() < 10 ? '0' : '') + d.getDate() + '/' + (d.getMonth() < 9 ? '0' : '') + (d.getMonth() + 1);
+  }
+
+  window.graficoBarraSemanal = function (canvasId, semanas) {
+    var elemento = document.getElementById(canvasId);
+    if (!elemento || !semanas.length) return null;
+
+    var labels = semanas.map(function (s) { return rotuloSemana(s) + (s.parcial ? '*' : ''); });
+    var dados = semanas.map(function (s) { return s.venda; });
+    var cores = semanas.map(function (s) {
+      if (s.parcial) return 'rgba(91,141,239,.35)'; // semana incompleta, ainda sem 7 dias de dado
+      return s.tem_oferta ? COR_DESTAQUE : COR_NORMAL;
+    });
+
+    var rotuloImpacto = {
+      id: 'rotuloImpacto',
+      afterDatasetsDraw: function (chart) {
+        var ctx = chart.ctx;
+        var meta = chart.getDatasetMeta(0);
+        ctx.save();
+        ctx.font = '700 12px -apple-system, "Segoe UI", Roboto, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = COR_DESTAQUE;
+        semanas.forEach(function (s, i) {
+          if (s.crescimento_pct === null || s.crescimento_pct === undefined) return;
+          var seta = s.crescimento_pct >= 0 ? '▲ +' : '▼ ';
+          var texto = seta + Math.abs(s.crescimento_pct).toFixed(0) + '%';
+          var elem = meta.data[i];
+          ctx.fillText(texto, elem.x, elem.y - 10);
+        });
+        ctx.restore();
+      },
+    };
+
+    return new Chart(elemento, {
+      type: 'bar',
+      data: { labels: labels, datasets: [{ label: 'Venda', data: dados, backgroundColor: cores, borderRadius: 4 }] },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        layout: { padding: { top: 24 } },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              title: function (itens) {
+                var s = semanas[itens[0].dataIndex];
+                return s.inicio.split('-').reverse().join('/') + ' a ' + s.fim.split('-').reverse().join('/');
+              },
+              label: function (ctx) { return 'Venda: ' + formatarNumeroBR(ctx.parsed.y, 2).replace(/^/, 'R$ '); },
+            },
+          },
+        },
+        scales: {
+          x: { grid: { display: false } },
+          y: { beginAtZero: true, ticks: { callback: function (v) { return 'R$ ' + formatarNumeroBR(v, 0); } } },
+        },
+      },
+      plugins: [rotuloImpacto],
+    });
+  };
 })();

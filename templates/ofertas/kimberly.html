@@ -55,6 +55,8 @@
 {{ grafico|json_script:"dados-grafico-kimberly" }}
 {{ series_produtos|json_script:"dados-series-produtos-kimberly" }}
 
+{% include "ofertas/_grafico_semanal.html" with id_semanal="kimberly" id_dados_semanal="dados-semanas-kimberly" %}
+
 <h3>Venda por bandeira</h3>
 <table class="tabela-interativa">
   <thead>
@@ -113,5 +115,10 @@
       tr.classList.toggle('selecionada', destacarProduto(tr.dataset.produto));
     });
   });
+
+  var dadosSemanas = document.getElementById('dados-semanas-kimberly');
+  if (dadosSemanas) {
+    graficoBarraSemanal('grafico-semanal-kimberly', JSON.parse(dadosSemanas.textContent));
+  }
 </script>
 {% endblock %}

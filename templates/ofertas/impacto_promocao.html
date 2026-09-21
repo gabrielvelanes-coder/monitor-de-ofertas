@@ -38,6 +38,8 @@
 {{ grafico|json_script:"dados-grafico-promocao" }}
 {{ series_produtos|json_script:"dados-series-produtos-promocao" }}
 
+{% include "ofertas/_grafico_semanal.html" with id_semanal="promocao" id_dados_semanal="dados-semanas-promocao" %}
+
 <details class="secao" open>
   <summary>Lojas</summary>
   <table class="tabela-interativa">
@@ -97,5 +99,10 @@
       tr.classList.toggle('selecionada', destacarProduto(tr.dataset.produto));
     });
   });
+
+  var dadosSemanas = document.getElementById('dados-semanas-promocao');
+  if (dadosSemanas) {
+    graficoBarraSemanal('grafico-semanal-promocao', JSON.parse(dadosSemanas.textContent));
+  }
 </script>
 {% endblock %}
