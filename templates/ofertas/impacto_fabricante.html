@@ -31,19 +31,20 @@
 {{ grafico|json_script:"dados-grafico-fabricante" }}
 {{ series_produtos|json_script:"dados-series-produtos-fabricante" }}
 
-{% if campanhas|length > 1 %}
+{% if tem_multiplas_campanhas %}
 <details class="secao" open>
   <summary>Campanhas</summary>
   <p style="color:var(--muted); font-size:12.5px; margin-top:-4px;">
     Mais de 1 promoção rodando ao mesmo tempo — investimento/venda de cada uma separado, sem misturar.
+    Clique numa linha pra ver a evolução mensal dela no gráfico acima.
   </p>
-  <table class="tabela-interativa">
+  <table id="tabela-campanhas" class="tabela-interativa">
     <thead>
       <tr><th>Campanha</th><th>Itens</th><th>Venda</th><th>Margem</th><th>Lucro</th></tr>
     </thead>
     <tbody>
       {% for c in campanhas %}
-        <tr>
+        <tr class="linha-clicavel" data-campanha="{{ c.campanha }}">
           <td>{{ c.campanha }}</td>
           <td>{{ c.itens_oferta|numero }}</td>
           <td>{{ c.venda_oferta|brl }}</td>
@@ -54,6 +55,7 @@
     </tbody>
   </table>
 </details>
+{{ series_campanhas|json_script:"dados-series-campanhas-fabricante" }}
 {% endif %}
 
 <details class="secao" open>
@@ -139,5 +141,16 @@
       tr.classList.toggle('selecionada', destacarProduto(tr.dataset.produto));
     });
   });
+
+  var dadosSeriesCampanhas = document.getElementById('dados-series-campanhas-fabricante');
+  if (dadosSeriesCampanhas) {
+    var seriesCampanhas = JSON.parse(dadosSeriesCampanhas.textContent);
+    var destacarCampanha = iniciarDrillDown(chart, seriesCampanhas, 'Venda');
+    document.querySelectorAll('#tabela-campanhas .linha-clicavel').forEach(function (tr) {
+      tr.addEventListener('click', function () {
+        tr.classList.toggle('selecionada', destacarCampanha(tr.dataset.campanha));
+      });
+    });
+  }
 </script>
 {% endblock %}

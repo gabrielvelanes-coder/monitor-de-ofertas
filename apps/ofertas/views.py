@@ -6,6 +6,7 @@ from django.shortcuts import render
 from apps.lojas.models import Loja
 from apps.verba.services import anexar_cmv, cmv_pct, cmv_pct_com_verba, verba_apurada
 
+from .erp import tag_sem_prefixo
 from .models import Lancamento
 from .services import (
     ACOES_INFO, bandeira_da_request, calcular_cestoes,
@@ -258,9 +259,20 @@ def impacto_fabricante(request, fabricante):
     meses = meses_disponiveis(mecanica)
     mes = mes_da_request(request, mecanica)
 
-    queryset = filtrar_por_bandeira(
+    queryset_sem_mes = filtrar_por_bandeira(
         Lancamento.objects.filter(mecanica=mecanica), bandeira
     )
+    # A mecânica pode ter campanha que só rodou em outro mês (ex.: a
+    # promoção mensal normal da Procter ainda não tem dado de setembro,
+    # só a Semana do Cliente) -- "tem mais de 1 campanha" precisa olhar
+    # TODOS os meses, senão a seção "Campanhas" pisca escondida ao trocar
+    # o filtro de mês pra um em que só 1 delas tem lançamento.
+    tags_brutas = queryset_sem_mes.filter(
+        grupo=Lancamento.GRUPO_OFERTA
+    ).exclude(tag_origem='').values_list('tag_origem', flat=True).distinct()
+    tem_multiplas_campanhas = len({tag_sem_prefixo(t) for t in tags_brutas}) > 1
+
+    queryset = queryset_sem_mes
     if mes:
         queryset = queryset.filter(ano_mes=mes)
     dados = calcular_impacto_fabricante(queryset, busca=busca)
@@ -293,6 +305,7 @@ def impacto_fabricante(request, fabricante):
         'fabricante_rotulo': rotulo,
         'meses_disponiveis': meses,
         'mes_atual': mes,
+        'tem_multiplas_campanhas': tem_multiplas_campanhas,
         'grafico': grafico,
         **dados,
     }

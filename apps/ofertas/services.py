@@ -432,6 +432,7 @@ def calcular_impacto_fabricante(queryset, busca: str = ''):
     # linha), não mistura o investimento das duas. Quando só existe 1 tag de
     # oferta, isso vira uma tabela de 1 linha só (a tela esconde nesse caso).
     por_campanha = defaultdict(lambda: {'itens_oferta': ZERO, 'venda_oferta': ZERO, 'lucro_oferta': ZERO})
+    por_campanha_mes = defaultdict(lambda: defaultdict(lambda: ZERO))
 
     totais = {g: {'itens': ZERO, 'venda': ZERO, 'custo': ZERO, 'lucro': ZERO}
               for g in (Lancamento.GRUPO_BASE, Lancamento.GRUPO_OFERTA)}
@@ -468,10 +469,12 @@ def calcular_impacto_fabricante(queryset, busca: str = ''):
             produto['lucro_oferta'] += lucro
             por_produto_mes[linha['produto_descricao']][linha['ano_mes']] += venda
 
-            campanha = por_campanha[tag_sem_prefixo(linha['tag_origem']) or '(sem tag)']
+            nome_campanha = tag_sem_prefixo(linha['tag_origem']) or '(sem tag)'
+            campanha = por_campanha[nome_campanha]
             campanha['itens_oferta'] += itens
             campanha['venda_oferta'] += venda
             campanha['lucro_oferta'] += lucro
+            por_campanha_mes[nome_campanha][linha['ano_mes']] += venda
 
     def _margem_pct(g):
         venda = totais[g]['venda']
@@ -517,6 +520,7 @@ def calcular_impacto_fabricante(queryset, busca: str = ''):
             ],
             key=lambda c: c['venda_oferta'], reverse=True,
         ),
+        'series_campanhas': alinhar_com_labels(por_campanha_mes, labels),
     }
 
 
