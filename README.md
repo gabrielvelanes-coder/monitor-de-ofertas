@@ -85,6 +85,22 @@ caso a tela de Procter ganha uma seção "Campanhas" separando
 investimento/venda de cada uma (ver `Lancamento.tag_origem` +
 `calcular_impacto_fabricante`, `apps/ofertas/services.py`).
 
+**Dado por dia (22/09/26):** Kenvue/Principia/Botica/Procter/Kimberly
+importam relatório bruto "Análise de Venda por Item" (com coluna
+`Data`), 100% de cobertura — Leve3 e Deu a Louca/Ultra Queimão têm
+cobertura parcial (só os meses re-exportados nesse formato); Cestões e
+Itens do Marketing ainda são só agregado por `Ano-mês`. Toda tela com
+`data` populada ganha 2 gráficos extras: "Venda por mês" virou **barra**
+em vez de linha (mês é categoria discreta, não contínua) em todo
+lugar, e um gráfico novo "Venda por semana" (`serie_semanal`,
+`apps/ofertas/services.py`) — semana com `grupo=oferta` destacada +
+% de crescimento vs. a média das semanas sem oferta, escrito em cima
+da própria barra (`graficoBarraSemanal`, `static/js/graficos.js`,
+template parcial `templates/ofertas/_grafico_semanal.html`). Semana
+ainda incompleta (sem 7 dias) ou o filtro de mês selecionado cortando
+uma semana ao meio ficam marcadas/tratadas à parte, não entram na
+comparação (2 bugs reais achados e corrigidos em 22/09/26).
+
 ## Pendências
 
 - **Controle de verba/recebimento + CMV com/sem verba — implementado
@@ -107,12 +123,23 @@ investimento/venda de cada uma (ver `Lancamento.tag_origem` +
     que **cada indústria tem sua própria regra e formato** (não dá pra
     usar 1 fórmula genérica pras 4, diferente do que se assumiu ao
     planejar o módulo). **Procter Semana do Cliente — resolvido
-    (21/09/26):** Gabriel mandou `rebaixas_produtos procter.xlsx`
-    (EAN/Produto/Rebaixa, valor fixo em R$ por UNIDADE vendida) — 1ª
-    regra real recebida. Modelo `RebaixaProduto` (`apps/produtos`,
-    escopado por mecânica+campanha), `manage.py importar_rebaixas`. A
-    promoção mensal normal da Procter (tag "PROMOÇÃO PROCTER") e os
-    outros 3 fabricantes ainda não têm regra.
+    (21/09/26):** `rebaixas_produtos procter.xlsx` (EAN/Produto/Rebaixa,
+    valor fixo em R$ por UNIDADE vendida). Modelo `RebaixaProduto`
+    (`apps/produtos`, escopado por mecânica+campanha), `manage.py
+    importar_rebaixas`. **Kenvue — fórmula decodificada mas BLOQUEADA
+    (22/09/26):** Gabriel manda um "calendário" bem mais rico (planilha
+    com aba RESUMO/RELATÓRIO PADRÃO/Produtos/vendas) — fórmula é
+    `Investimento = Menor Preço × % Desconto × Qtd Vendida (na janela
+    Início-Fim)`, diferente da Procter (que não tem "preço de
+    referência"). Conferida na mão com o exemplo de julho (já
+    preenchido), bate exato. **Bloqueado:** o calendário do mês
+    corrente vem com Qtd Vendida/Investimento zerados — só preenche
+    quando o Gabriel cola a aba "vendas" manual no final da campanha.
+    Ideia levantada, não decidida: calcular a Qtd Vendida sozinho
+    batendo EAN+janela de datas contra a venda que a Kenvue já tem
+    importada (100% com dia desde 22/09) em vez de depender da cola
+    manual — **aguardando o Gabriel confirmar.** Principia/Botica
+    ainda sem regra nenhuma.
   - **Cestões / Itens do Marketing / Kimberly:** ainda não confirmado se
     essas 3 ações têm verba/reembolso da indústria ou se são só de
     exposição/giro sem repasse financeiro — pergunta feita ao Gabriel,
@@ -120,20 +147,20 @@ investimento/venda de cada uma (ver `Lancamento.tag_origem` +
   - **Supra Corp Day:** nem chegou a ser perguntado ainda — evento
     pontual de degustação, pode ser patrocínio de valor fixo em vez de
     fórmula sobre venda (a decidir quando entrar na fila).
-- **Arquivo de apuração pra enviar à indústria — 1ª implementação real
-  (21/09/26)**, pra Procter Semana do Cliente (única ação com regra de
-  rebaixa cadastrada até agora). `apps/ofertas/apuracao.py`
-  (`montar_apuracao_industria`) + `manage.py exportar_apuracao_industria
-  --mecanica --campanha` gera o `.xlsx`: base = vendas por item da
-  campanha linha a linha (igual ao relatório original) + colunas
-  "Valor da Rebaixa (R$/un.)" e "Investimento (R$)" (itens × rebaixa).
-  EAN resolvido via cadastro de produtos, com fallback por nome exato
-  contra a própria tabela de rebaixa. Testado com dado real: 189
-  linhas, R$ 650,00 de investimento total, 100% das linhas com rebaixa
-  resolvida. **Só roda via management command ainda — sem botão/tela no
-  painel** (avaliar se vale a pena quando a 2ª mecânica com rebaixa
-  chegar). Generaliza pra qualquer mecânica/campanha com
-  `RebaixaProduto` cadastrado, não é específico da Procter.
+- **Arquivo de apuração pra enviar à indústria — implementado pra Leve3
+  e Procter Semana do Cliente (21-22/09/26).** `apps/ofertas/apuracao.py`:
+  `montar_apuracao_industria` (fabricantes, via `RebaixaProduto`) e
+  `montar_apuracao_leve3` (fórmula própria, ciclos × custo, não
+  depende de rebaixa cadastrada — sai **1 arquivo por fabricante
+  genérico**, EMS/Eurofarma/Germed/etc., não 1 só misturado).
+  `manage.py exportar_apuracao_industria --mecanica --campanha|--mes
+  [--fabricante|--todos-fabricantes]` e **botão "Baixar apuração" nas
+  telas de Leve3 e Procter** (view `exportar_apuracao`, rota
+  `/apuracao/<mecanica>/` — só aparece pra campanha que já tem regra
+  cadastrada). Nome do arquivo padronizado: `apuracao_<oferta>_<mês>.xlsx`.
+  Testado com dado real (Leve3: 3.286 linhas, R$ 50.646,84 — bate exato
+  com o painel depois de corrigir um bug de arredondamento linha a
+  linha; Procter: 189 linhas, R$ 650,00, 100% resolvido).
 - Kimberly: importador aceita curadoria manual (`--produto`/
   `--venda-max`/`--data-inicio`/`--data-fim`), mas a fórmula ainda
   precisa da validação do Gabriel.
