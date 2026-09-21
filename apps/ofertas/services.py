@@ -17,6 +17,8 @@ from collections import defaultdict
 from datetime import date, timedelta
 from decimal import Decimal
 
+from django.db.models import Sum
+
 from apps.lojas.models import Loja
 
 from .erp import ano_mes_de, tag_sem_prefixo
@@ -406,11 +408,32 @@ def calcular_supracorp(queryset):
     }
 
 
-def calcular_impacto_fabricante(queryset, busca: str = ''):
+def _meses_antes(ano_mes: str, quantos: int) -> list[str]:
+    """'2026-09', 3 -> ['2026-08', '2026-07', '2026-06'] (mais recente
+    primeiro)."""
+    ano, mes_num = int(ano_mes[:4]), int(ano_mes[5:7])
+    meses = []
+    for i in range(1, quantos + 1):
+        m = mes_num - i
+        a = ano
+        while m <= 0:
+            m += 12
+            a -= 1
+        meses.append(f'{a:04d}-{m:02d}')
+    return meses
+
+
+def calcular_impacto_fabricante(queryset, busca: str = '', queryset_baseline=None):
     """Oferta por fabricante — Kenvue/Principia/Botica/Procter (docx, seção
     5.3): compara volume/venda/margem da promoção do fabricante (oferta —
     tag exata) com todo o resto das vendas dele, incluindo "Sem Desconto"
-    (base), mês a mês, por loja/bandeira e por produto."""
+    (base), mês a mês, por loja/bandeira e por produto.
+
+    `queryset_baseline` (opcional): mesma mecânica/bandeira SEM o filtro de
+    mês (pra "% crescimento" poder olhar os 3 meses ANTES do mês da oferta,
+    mesmo com um mês específico selecionado na tela — sem isso, o cálculo
+    ficaria sem dado nenhum de meses anteriores). Quando omitido, cai pra
+    comparar com o resto do PRÓPRIO mês (comportamento anterior, 22/09)."""
     linhas = queryset.select_related('loja').values(
         'loja_id', 'loja__codigo', 'loja__bandeira', 'produto_descricao',
         'grupo', 'tag_origem', 'ano_mes', 'data', 'itens', 'venda', 'custo', 'lucro',
@@ -495,30 +518,65 @@ def calcular_impacto_fabricante(queryset, busca: str = ''):
         venda = totais[g]['venda']
         return (totais[g]['lucro'] / venda * 100) if venda else ZERO
 
-    def _crescimento_pct(venda_oferta_por_mes, venda_base_por_mes):
-        """% de crescimento: venda média por DIA durante a oferta vs. venda
-        média por dia no resto do MESMO mês (mesma lógica do Supra Corp Day
-        -- `calcular_supracorp`). Soma oferta/base/dias de todos os meses
-        presentes antes de dividir (não faz média de percentuais). `None`
-        quando não dá pra calcular -- sem dia de oferta identificado (o
-        relatório de origem não tinha coluna "Data", só "Ano-mês") ou sem
-        venda base no(s) mesmo(s) mês(es) da oferta (ex.: mês em que só a
-        campanha tem dado importado, a promoção "irmã" ainda não veio)."""
+    # "% crescimento" (pedido 22/09, decidido junto com o Gabriel depois de
+    # comparar as opções): venda média por DIA durante a oferta vs. venda
+    # média por dia dos 3 MESES ANTERIORES ao mês da oferta (não "resto do
+    # próprio mês" — 1 mês só de base é amostra fina demais pra um produto
+    # promocional, viu no dado real: 1 linha, R$37 no mês inteiro). Só é
+    # possível quando `queryset_baseline` foi passado (precisa enxergar
+    # meses fora do filtro de mês da tela); sem ele, cai pra "resto do
+    # próprio mês" (comportamento de 22/09, pra não quebrar quem ainda não
+    # foi adaptado pra passar o baseline).
+    base_3meses_por_produto_mes = None
+    if queryset_baseline is not None:
+        base_3meses_por_produto_mes = defaultdict(lambda: defaultdict(lambda: ZERO))
+        for linha in (
+            queryset_baseline.filter(grupo=Lancamento.GRUPO_BASE)
+            .values('produto_descricao', 'ano_mes')
+            .annotate(venda_total=Sum('venda'))
+        ):
+            base_3meses_por_produto_mes[linha['produto_descricao']][linha['ano_mes']] += (
+                linha['venda_total'] or ZERO
+            )
+
+    def _crescimento_pct(nomes_produtos, venda_oferta_por_mes):
+        """`nomes_produtos`: 1 produto (lista de 1) pra linha da tabela, ou
+        todos os produtos da oferta (lista) pro KPI agregado -- soma a base
+        só DESSES produtos, nunca do catálogo inteiro do fabricante (achado
+        real 22/09: comparar contra o catálogo inteiro dava crescimento
+        geral NEGATIVO enquanto cada produto individual dava positivo,
+        inconsistente — o denominador tinha que ser o mesmo conjunto).
+        `None` quando não dá pra calcular: sem dia de oferta identificado
+        (relatório sem coluna "Data") ou sem nenhuma venda base nos meses
+        de referência (produto novo, ou meses antes de jan/26 — não tem
+        dado, não força um número inventado)."""
         total_oferta, total_dias_oferta = ZERO, 0
-        total_base, total_dias_resto = ZERO, 0
+        total_base, total_dias_base = ZERO, 0
         for ano_mes, venda_oferta_mes in venda_oferta_por_mes.items():
             dias_oferta_mes = len(dias_oferta_por_mes.get(ano_mes, set()))
             if not dias_oferta_mes:
                 continue
             total_oferta += venda_oferta_mes
             total_dias_oferta += dias_oferta_mes
-            total_base += venda_base_por_mes.get(ano_mes, ZERO)
-            ano, mes_num = int(ano_mes[:4]), int(ano_mes[5:7])
-            total_dias_resto += calendar.monthrange(ano, mes_num)[1] - dias_oferta_mes
-        if not total_dias_oferta or not total_dias_resto or not total_base:
+
+            if base_3meses_por_produto_mes is not None:
+                meses_ref = _meses_antes(ano_mes, 3)
+                fonte = base_3meses_por_produto_mes
+                desconto_dias = 0
+            else:
+                meses_ref = [ano_mes]
+                fonte = por_produto_base_mes
+                desconto_dias = dias_oferta_mes
+
+            for mes_ref in meses_ref:
+                for nome in nomes_produtos:
+                    total_base += fonte[nome].get(mes_ref, ZERO)
+                ano, mes_num = int(mes_ref[:4]), int(mes_ref[5:7])
+                total_dias_base += calendar.monthrange(ano, mes_num)[1] - desconto_dias
+        if not total_dias_oferta or not total_dias_base or not total_base:
             return None
         media_oferta = total_oferta / total_dias_oferta
-        media_base = total_base / total_dias_resto
+        media_base = total_base / total_dias_base
         return ((media_oferta / media_base - 1) * 100) if media_base else None
 
     kpis = {
@@ -531,28 +589,15 @@ def calcular_impacto_fabricante(queryset, busca: str = ''):
         'lucro_oferta': totais[Lancamento.GRUPO_OFERTA]['lucro'],
         'margem_oferta_pct': _margem_pct(Lancamento.GRUPO_OFERTA),
         'crescimento_pct': _crescimento_pct(
+            list(por_produto.keys()),
             {mes: valores['venda_oferta'] for mes, valores in por_mes.items()},
-            # Base só dos MESMOS produtos que estão na oferta -- usar
-            # `por_mes[...]['venda_base']` aqui compararia contra o
-            # catálogo Procter inteiro (milhares de produtos fora da
-            # promoção), não contra a linha de base desses produtos
-            # específicos (achado real: dava crescimento geral NEGATIVO
-            # enquanto cada produto individual dava positivo -- inconsistente,
-            # porque o denominador não era o mesmo conjunto de produtos).
-            {
-                mes: sum(
-                    (por_produto_base_mes[produto].get(mes, ZERO) for produto in por_produto),
-                    ZERO,
-                )
-                for mes in por_mes
-            },
         ),
     }
 
     produtos = [
         {
             'produto': nome, **valores,
-            'crescimento_pct': _crescimento_pct(por_produto_mes[nome], por_produto_base_mes[nome]),
+            'crescimento_pct': _crescimento_pct([nome], por_produto_mes[nome]),
         }
         for nome, valores in por_produto.items()
         if not busca or busca.lower() in nome.lower()

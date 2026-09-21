@@ -275,7 +275,7 @@ def impacto_fabricante(request, fabricante):
     queryset = queryset_sem_mes
     if mes:
         queryset = queryset.filter(ano_mes=mes)
-    dados = calcular_impacto_fabricante(queryset, busca=busca)
+    dados = calcular_impacto_fabricante(queryset, busca=busca, queryset_baseline=queryset_sem_mes)
     grafico = grafico_mensal(dados['por_mes'], [
         ('venda_base', 'Venda base'), ('venda_oferta', 'Venda oferta'),
         ('itens_base', 'Itens base', 'unidades'), ('itens_oferta', 'Itens oferta', 'unidades'),

@@ -28,10 +28,10 @@
       {% if kpis.crescimento_pct is not None %}
         {% if kpis.crescimento_pct >= 0 %}+{% endif %}{{ kpis.crescimento_pct|numero:1 }}%
       {% else %}
-        <span class="vazio" title="Precisa de venda base no mesmo mês da oferta e de dia identificado no relatório (coluna 'Data') pra calcular">—</span>
+        <span class="vazio" title="Precisa de venda base nos 3 meses antes da oferta e de dia identificado no relatório (coluna 'Data') pra calcular">—</span>
       {% endif %}
     </div>
-    <div style="color:var(--muted); font-size:11px; margin-top:4px;">venda média/dia na oferta vs. venda média/dia sem oferta, mesmo mês</div>
+    <div style="color:var(--muted); font-size:11px; margin-top:4px;">venda média/dia na oferta vs. venda média/dia nos 3 meses antes</div>
   </div>
 </div>
 
@@ -133,7 +133,7 @@
           {% if p.crescimento_pct is not None %}
             {% if p.crescimento_pct >= 0 %}+{% endif %}{{ p.crescimento_pct|numero:1 }}%
           {% else %}
-            <span class="vazio" title="Sem venda base no mesmo mês pra comparar">—</span>
+            <span class="vazio" title="Sem venda base nos 3 meses antes pra comparar">—</span>
           {% endif %}
         </td>
         <td>{{ p.cmv_pct_sem_verba|numero:1 }}%</td>
