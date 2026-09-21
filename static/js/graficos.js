@@ -178,6 +178,26 @@
     };
   };
 
+  // Clicar num mês do gráfico de evolução mensal aplica o mesmo filtro
+  // "Mês" da barra de topo (<select id="mes">, já existe em toda tela de
+  // ação) sem precisar abrir o seletor — reenvia o mesmo form, que já
+  // preserva bandeira/fabricante/busca via querystring_extra. `labelsOriginais`
+  // são os valores AAAA-MM crus (`dados.labels`, antes do `.map(maiuscula)`
+  // que só afeta o que aparece desenhado no eixo).
+  window.ativarCliqueMes = function (chart, labelsOriginais) {
+    var select = document.getElementById('mes');
+    if (!select) return;
+    chart.canvas.style.cursor = 'pointer';
+    chart.options.onClick = function (evento) {
+      var pontos = chart.getElementsAtEventForMode(evento, 'index', { intersect: false }, true);
+      if (!pontos.length) return;
+      var mes = labelsOriginais[pontos[0].index];
+      if (!mes) return;
+      select.value = mes;
+      select.form.submit();
+    };
+  };
+
   window.graficoBarra = function (canvasId, labels, series, destaqueIndices) {
     var elemento = document.getElementById(canvasId);
     if (!elemento) return null;

@@ -82,6 +82,7 @@
 <script>
   var dados = JSON.parse(document.getElementById('dados-grafico-promocao').textContent);
   var chart = graficoLinha('grafico-promocao', dados.labels, dados.series);
+  ativarCliqueMes(chart, dados.labels);
   var seriesProdutos = JSON.parse(document.getElementById('dados-series-produtos-promocao').textContent);
   var destacarProduto = iniciarDrillDown(chart, seriesProdutos, 'Venda oferta');
   document.querySelectorAll('#tabela-produtos .linha-clicavel').forEach(function (tr) {
