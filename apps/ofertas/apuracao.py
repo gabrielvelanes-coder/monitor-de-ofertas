@@ -1,8 +1,17 @@
 """Arquivo de apuração pra enviar à indústria (docx, pendência aberta desde
-13/09/26) — base = relatório de vendas por item da campanha (linha a linha,
-não agregado), + valor da rebaixa por unidade + investimento total que o
-fabricante deve pagar. 1ª implementação real: Procter Semana do Cliente,
-usando a tabela de rebaixa que o Gabriel mandou (`RebaixaProduto`).
+13/09/26) — base = relatório de vendas por item, linha a linha (não
+agregado), + investimento que o fabricante deve pagar. 2 fórmulas
+diferentes, dependendo da mecânica:
+
+- Ofertas de fabricante (Kenvue/Principia/Botica/Procter, `grupo=oferta`):
+  `montar_apuracao_industria` -- valor de rebaixa por EAN (`RebaixaProduto`,
+  o fabricante manda a tabela; 1ª implementação real: Procter Semana do
+  Cliente).
+- Leve 3 Pague 2: `montar_apuracao_leve3` -- fórmula própria automática já
+  validada (ciclos × custo), não depende de tabela de rebaixa nenhuma.
+
+Cestões/Marketing/Kimberly/Supra Corp ainda não têm fórmula definida (ver
+README, seção Pendências) -- não têm função de apuração ainda.
 """
 from __future__ import annotations
 
@@ -68,7 +77,10 @@ def montar_apuracao_industria(mecanica: str, campanha: str) -> dict:
             'custo': l['custo'] or ZERO,
             'lucro': l['lucro'] or ZERO,
             'valor_rebaixa_unitario': valor_rebaixa,
-            'investimento': (itens * valor_rebaixa).quantize(Decimal('0.01')),
+            # Sem quantize aqui pelo mesmo motivo do Leve3 (ver
+            # montar_apuracao_leve3) -- soma em precisão cheia, arredondar
+            # só na exportação.
+            'investimento': itens * valor_rebaixa,
         })
 
     return {
@@ -76,4 +88,56 @@ def montar_apuracao_industria(mecanica: str, campanha: str) -> dict:
         'total_investimento': sum((r['investimento'] for r in resultado), ZERO),
         'total_itens': sum((r['itens'] for r in resultado), ZERO),
         'produtos_sem_rebaixa': sorted(sem_rebaixa),
+    }
+
+
+def montar_apuracao_leve3(ano_mes: str | None = None) -> dict:
+    """Leve 3 Pague 2 tem fórmula própria automática (docx, seção 5.1/6) --
+    não depende de tabela de rebaixa nenhuma, diferente das ofertas de
+    fabricante. Mesmo cálculo linha a linha do `calcular_leve3`
+    (`services.py`), só que devolvendo cada linha pronta pra exportar em
+    vez de já agregada: ciclos = itens // 3; investimento = ciclos ×
+    (custo da linha / itens da linha). `ano_mes` (opcional, "AAAA-MM")
+    filtra pra 1 mês só; omitido = todos."""
+    queryset = Lancamento.objects.filter(mecanica=Lancamento.LEVE3)
+    if ano_mes:
+        queryset = queryset.filter(ano_mes=ano_mes)
+    linhas = queryset.select_related('loja').values(
+        'loja__codigo', 'loja__bandeira', 'data', 'ano_mes',
+        'produto_descricao', 'itens', 'venda', 'custo', 'lucro',
+    )
+
+    resultado = []
+    for l in linhas:
+        itens = l['itens'] or ZERO
+        custo = l['custo'] or ZERO
+        custo_unitario = (custo / itens) if itens else ZERO
+        ciclos = itens // 3
+        # Sem arredondar aqui -- arredondar cada linha pra 2 casas e DEPOIS
+        # somar dá um total diferente da soma em precisão cheia (achado
+        # real: R$50.646,77 vs R$50.646,84 do painel, 3.286 linhas, 7
+        # centavos de diferença acumulada). O painel (`calcular_leve3`)
+        # nunca arredonda linha a linha -- fica igual aqui, o
+        # arredondamento pra 2 casas só acontece na exportação (cosmético,
+        # não usado pra somar `total_investimento` abaixo).
+        investimento = ciclos * custo_unitario
+        resultado.append({
+            'loja': l['loja__codigo'],
+            'bandeira': l['loja__bandeira'],
+            'data': l['data'],
+            'ano_mes': l['ano_mes'],
+            'produto': l['produto_descricao'],
+            'itens': itens,
+            'venda': l['venda'] or ZERO,
+            'custo': custo,
+            'lucro': l['lucro'] or ZERO,
+            'ciclos': ciclos,
+            'custo_unitario': custo_unitario.quantize(Decimal('0.0001')),
+            'investimento': investimento,
+        })
+
+    return {
+        'linhas': resultado,
+        'total_investimento': sum((r['investimento'] for r in resultado), ZERO),
+        'total_itens': sum((r['itens'] for r in resultado), ZERO),
     }
