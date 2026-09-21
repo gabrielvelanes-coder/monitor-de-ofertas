@@ -11,7 +11,9 @@ class Command(BaseCommand):
     help = (
         'Importa Ofertas Procter (baseline_procter_2026.xls): compara a tag '
         '"PROMOÇÃO PROCTER" (oferta) com todo o resto das vendas do '
-        'fabricante, incluindo "Sem Desconto" (base) (docx, seção 5.3).'
+        'fabricante, incluindo "Sem Desconto" (base) (docx, seção 5.3). '
+        'Coexiste com a Semana do Cliente (importar_procter_semana) -- '
+        'escopo_delete="arquivo", só substitui o que este arquivo trouxer.'
     )
 
     def add_arguments(self, parser):
@@ -23,6 +25,7 @@ class Command(BaseCommand):
         )
         resultado = importar_relatorio_fabricante(
             caminho, Lancamento.PROCTER, 'PROMOÇÃO PROCTER', fabricante='Procter & Gamble',
+            escopo_delete='arquivo',
         )
         self.stdout.write(self.style.SUCCESS(
             f"Procter: {resultado['importados']} lançamentos importados "

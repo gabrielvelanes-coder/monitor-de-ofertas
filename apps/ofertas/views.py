@@ -22,10 +22,6 @@ FABRICANTES = {
     'principia': (Lancamento.PRINCIPIA, 'Principia'),
     'botica': (Lancamento.BOTICA, 'Botica Nacional'),
     'procter': (Lancamento.PROCTER, 'Procter & Gamble'),
-    # ação pontual, tag própria (diferente de "PROMOÇÃO PROCTER") — mesmo
-    # fabricante, mecânica separada pra não misturar o investimento das duas
-    # promoções que rodam no mesmo mês.
-    'procter_semana': (Lancamento.PROCTER_SEMANA, 'Procter Semana do Cliente'),
 }
 
 # Promoções pontuais restritas a 1 bandeira (Deu a Louca só Velanes, Ultra

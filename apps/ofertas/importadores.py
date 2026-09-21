@@ -23,7 +23,16 @@ from .erp import (
 from .models import Lancamento
 
 
-def importar_relatorio_fabricante(caminho, mecanica: str, tag_alvo: str, fabricante: str) -> dict:
+def importar_relatorio_fabricante(
+    caminho, mecanica: str, tag_alvo: str, fabricante: str, escopo_delete: str = 'mecanica',
+) -> dict:
+    """`escopo_delete='mecanica'` (padrão, Kenvue/Principia/Botica): cada
+    import é um baseline completo, apaga a mecânica inteira antes de
+    recriar. `escopo_delete='arquivo'`: apaga só as linhas do MESMO nome de
+    arquivo -- usado quando a mecânica recebe mais de 1 relatório
+    coexistindo (ex. Procter tem a promoção mensal normal + a Semana do
+    Cliente, tags e arquivos diferentes, nenhum dos dois é o "todo" da
+    mecânica sozinho)."""
     df, _, _ = ler_relatorio_erp(caminho)
 
     col_loja = coluna(df, 'Cód. Un. Neg.')
@@ -98,8 +107,11 @@ def importar_relatorio_fabricante(caminho, mecanica: str, tag_alvo: str, fabrica
             arquivo_origem=caminho.name,
         ))
 
+    filtro_delete = {'mecanica': mecanica}
+    if escopo_delete == 'arquivo':
+        filtro_delete['arquivo_origem'] = caminho.name
     with transaction.atomic():
-        apagados, _ = Lancamento.objects.filter(mecanica=mecanica).delete()
+        apagados, _ = Lancamento.objects.filter(**filtro_delete).delete()
         Lancamento.objects.bulk_create(lancamentos, batch_size=1000)
 
     return {

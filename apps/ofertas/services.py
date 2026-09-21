@@ -19,7 +19,7 @@ from decimal import Decimal
 
 from apps.lojas.models import Loja
 
-from .erp import ano_mes_de
+from .erp import ano_mes_de, tag_sem_prefixo
 from .models import Lancamento
 
 ZERO = Decimal('0')
@@ -413,7 +413,7 @@ def calcular_impacto_fabricante(queryset, busca: str = ''):
     (base), mês a mês, por loja/bandeira e por produto."""
     linhas = queryset.select_related('loja').values(
         'loja_id', 'loja__codigo', 'loja__bandeira', 'produto_descricao',
-        'grupo', 'ano_mes', 'itens', 'venda', 'custo', 'lucro',
+        'grupo', 'tag_origem', 'ano_mes', 'itens', 'venda', 'custo', 'lucro',
     )
 
     por_mes = defaultdict(lambda: {
@@ -426,6 +426,12 @@ def calcular_impacto_fabricante(queryset, busca: str = ''):
     })
     por_produto = defaultdict(lambda: {'itens_oferta': ZERO, 'venda_oferta': ZERO, 'lucro_oferta': ZERO})
     por_produto_mes = defaultdict(lambda: defaultdict(lambda: ZERO))
+    # Uma mecânica pode ter mais de 1 campanha rodando (ex. Procter: a
+    # promoção mensal normal + a Semana do Cliente no mesmo mês, tags
+    # diferentes) -- agrupado pela tag original (`tag_origem`, já salva por
+    # linha), não mistura o investimento das duas. Quando só existe 1 tag de
+    # oferta, isso vira uma tabela de 1 linha só (a tela esconde nesse caso).
+    por_campanha = defaultdict(lambda: {'itens_oferta': ZERO, 'venda_oferta': ZERO, 'lucro_oferta': ZERO})
 
     totais = {g: {'itens': ZERO, 'venda': ZERO, 'custo': ZERO, 'lucro': ZERO}
               for g in (Lancamento.GRUPO_BASE, Lancamento.GRUPO_OFERTA)}
@@ -462,6 +468,11 @@ def calcular_impacto_fabricante(queryset, busca: str = ''):
             produto['lucro_oferta'] += lucro
             por_produto_mes[linha['produto_descricao']][linha['ano_mes']] += venda
 
+            campanha = por_campanha[tag_sem_prefixo(linha['tag_origem']) or '(sem tag)']
+            campanha['itens_oferta'] += itens
+            campanha['venda_oferta'] += venda
+            campanha['lucro_oferta'] += lucro
+
     def _margem_pct(g):
         venda = totais[g]['venda']
         return (totais[g]['lucro'] / venda * 100) if venda else ZERO
@@ -495,6 +506,17 @@ def calcular_impacto_fabricante(queryset, busca: str = ''):
         ),
         'produtos': produtos,
         'series_produtos': alinhar_com_labels(por_produto_mes, labels),
+        'campanhas': sorted(
+            [
+                {
+                    'campanha': nome, **valores,
+                    'margem_pct': (valores['lucro_oferta'] / valores['venda_oferta'] * 100)
+                    if valores['venda_oferta'] else ZERO,
+                }
+                for nome, valores in por_campanha.items()
+            ],
+            key=lambda c: c['venda_oferta'], reverse=True,
+        ),
     }
 
 

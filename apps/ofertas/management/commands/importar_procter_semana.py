@@ -9,10 +9,13 @@ from apps.ofertas.models import Lancamento
 
 class Command(BaseCommand):
     help = (
-        'Importa Procter Semana do Cliente (ação pontual, tag própria — '
-        'diferente da promoção mensal "PROMOÇÃO PROCTER"): compara a tag '
-        '"OFERTAS PROCTER SEMANA DO CLIENTE" (oferta) com todo o resto das '
-        'vendas Procter (base).'
+        'Importa Procter Semana do Cliente (ação pontual, tag própria '
+        '"OFERTAS PROCTER SEMANA DO CLIENTE" -- diferente de "PROMOÇÃO '
+        'PROCTER", a promoção mensal) DENTRO da mesma tela/mecânica '
+        'Procter, não uma ação separada -- as duas coexistem (Gabriel '
+        'quer ver as 2 juntas, com investimento próprio de cada uma; ver '
+        '"por campanha" na tela). escopo_delete="arquivo": reimportar só '
+        'substitui as linhas desta campanha, não mexe na promoção normal.'
     )
 
     def add_arguments(self, parser):
@@ -23,8 +26,8 @@ class Command(BaseCommand):
             '*procter*semana*cliente*.xls'
         )
         resultado = importar_relatorio_fabricante(
-            caminho, Lancamento.PROCTER_SEMANA, 'OFERTAS PROCTER SEMANA DO CLIENTE',
-            fabricante='Procter & Gamble',
+            caminho, Lancamento.PROCTER, 'OFERTAS PROCTER SEMANA DO CLIENTE',
+            fabricante='Procter & Gamble', escopo_delete='arquivo',
         )
         self.stdout.write(self.style.SUCCESS(
             f"Procter Semana do Cliente: {resultado['importados']} lançamentos importados "
