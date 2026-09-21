@@ -40,6 +40,13 @@
 
 <div class="grafico-card">
   <h3 style="margin-top:0;">Evolução mensal <small style="color:var(--muted); font-weight:400;">— clique num produto embaixo pra ver a série dele</small></h3>
+  {% if grafico.labels|length <= 1 %}
+    <p style="color:var(--muted); font-size:12.5px;">
+      Só {{ grafico.labels|length }} mês selecionado — com 1 ponto só, o gráfico de linha quase não
+      aparece. Os números certos estão nos cards acima; troque o filtro "Mês" pra "Todos os meses"
+      pra ver a evolução de verdade.
+    </p>
+  {% endif %}
   <canvas id="grafico-leve3"></canvas>
 </div>
 {{ grafico|json_script:"dados-grafico-leve3" }}
