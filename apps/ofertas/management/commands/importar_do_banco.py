@@ -25,19 +25,26 @@ leve3_fabricante`/Sellout usam, ex. "EMS"/"Eurofarma", não "EMS GENERICO
 S/A" como o ERP chama); `'kimberly'` -- 1 fabricante só (como `'fabricante'`),
 mas sem tag limpa pra oferta no ERP (achado antigo, não documentado no
 docx) -- "oferta" é um filtro MANUAL (produto/venda máxima/janela de
-data) aplicado linha a linha via `classificar_grupo`, não por tag."""
+data) aplicado linha a linha via `classificar_grupo`, não por tag;
+`'produtos'` (Supra Corp Day -- lista FIXA de produtos, sem tag pra
+descobrir sozinho, "Supra Corp" no ERP é a marca inteira da CATARINENSE,
+68 produtos, a mecânica só rastreia 5); `'promocao_bandeira'` (Deu a
+Louca/Ultra Queimão -- como `'produtos_com_tag'`, mas também restrito a
+1 bandeira via código de loja, `consultar_venda_por_produtos_e_lojas`)."""
 from __future__ import annotations
 
 from collections import defaultdict
 from datetime import date, datetime, timedelta
 
+import pandas as pd
 from django.core.management.base import BaseCommand, CommandError
 from django.db.models import Max, Sum
 
 from apps.lojas.models import Loja
 from apps.ofertas.erp import codigo_loja, fabricante_generico, tag_sem_prefixo
 from apps.ofertas.erp_banco import (
-    consultar_venda_por_item, consultar_venda_por_produtos, consultar_venda_por_tag,
+    consultar_venda_por_item, consultar_venda_por_produtos,
+    consultar_venda_por_produtos_e_lojas, consultar_venda_por_tag,
 )
 from apps.ofertas.importadores import importar_relatorio_fabricante
 from apps.ofertas.management.commands.importar_botica import TAGS_BOTICA
@@ -147,6 +154,71 @@ MECANICAS = {
             'SUPRA CORP WHEY PROTEIN MORANGO 450 G',
         ],
     },
+    # 7º tipo: como Cestões (acha produtos pela tag, depois traz o
+    # histórico completo deles), mas também restrito a 1 bandeira -- Deu a
+    # Louca só Velanes, Ultra Queimão só Ultra Popular (`importar_
+    # promocao_bandeira` antigo). `filtro` é uma LISTA de padrões ILIKE (>1
+    # variação de nome de caderno já vista: "ULTRA QUEIMAO SETEMBRO" era o
+    # nome fixo das 2 bandeiras até ago/26, só virou "DEU A LOUCA SETEMBRO"
+    # na Velanes a partir de set/26). **Achado real, cuidado (23/09/26):**
+    # o histórico do ERP tem cadernos "QUEIMA DE ESTOQUE"/"QUEIMÃO
+    # INAUGURAÇÃO DERMO JAGUAQUARA" de 2024/2025 (evento de inauguração de
+    # loja, nada a ver) que batem num padrão `%QUEIM%` largo demais --
+    # confirmado que NENHUM tem venda em 2026 (`INICIO_PADRAO` já filtra
+    # isso na prática), mas os padrões abaixo já vêm mais estreitos
+    # (`%QUEIM_O%`, não `%QUEIM%`) por segurança extra.
+    #
+    # BLOQUEADO PRA GRAVAÇÃO (23/09/26) -- `--comparar` mostra "oferta"
+    # batendo 0,00% exato (a identificação da tag está certa), mas "base"
+    # fica 5-12x maior que a planilha antiga em todo mês. Investigado: os
+    # arquivos que o Gabriel mandou pra jun-ago (`deu a louca ano - com
+    # loja.xls`) vieram JÁ FILTRADOS só com as linhas de oferta (grupo=base
+    # nunca existiu nesses 3 meses -- documentado em 17/09/26); o único mês
+    # com base real (set/26, arquivo "detalhe") tem só 105 produtos, MENOS
+    # que os 194 que a tag já revelou -- ou seja, nem "produtos que já
+    # tiveram a tag" bate com o que ele historicamente comparou. O
+    # `importar_promocao_bandeira` original documenta "base = todo o resto
+    # do portfólio da bandeira", mas isso nunca foi exportado de verdade
+    # (puxar o catálogo INTEIRO de 1 bandeira seria centenas de milhares de
+    # linhas/mês). Não dá pra saber com os dados que tenho qual é o recorte
+    # de "base" que faz sentido pro Gabriel -- perguntar antes de gravar.
+    'deu_a_louca': {
+        'tipo': 'promocao_bandeira', 'mecanica': Lancamento.DEU_A_LOUCA,
+        'fabricante': None, 'bandeira': Loja.VELANES,
+        'filtro': ['%DEU A LOUCA%', '%QUEIM_O%'],
+    },
+    'ultra_queimao': {
+        'tipo': 'promocao_bandeira', 'mecanica': Lancamento.ULTRA_QUEIMAO,
+        'fabricante': None, 'bandeira': Loja.ULTRA_POPULAR,
+        'filtro': ['%DEU A LOUCA%', '%QUEIM_O%'],
+    },
+    # Sellout: catálogo INTEIRO de 1 fabricante genérico (referência de giro
+    # pro impacto do Leve3, não tem oferta/base -- `tags: []`). 4 entradas
+    # (1 mecânica só, `Lancamento.SELLOUT`, `fabricante` diferencia) --
+    # `escopo_delete='mecanica_fabricante'` pra reimportar 1 sem apagar os
+    # outros 3. Achado (23/09/26): cada marca tem VÁRIAS variações de
+    # fabricante no ERP (ex. "EMS", "EMS GENERICO S/A", "EMS SIGMA") --
+    # resolvido batendo os produtos do cadastro `apps.produtos` já
+    # canônicos como "EMS" no Leve3 contra o fabricante real deles no
+    # banco: todos caem em "EMS GENERICO S/A" (idem Eurofarma ->
+    # "EUROFARMA GENERICO"; Germed/Prati não tinham variação nenhuma,
+    # nome exato mesmo).
+    'sellout_ems': {
+        'tipo': 'fabricante', 'mecanica': Lancamento.SELLOUT, 'tags': [],
+        'fabricante': 'EMS', 'filtro': 'EMS GENERICO S/A', 'escopo_delete': 'mecanica_fabricante',
+    },
+    'sellout_eurofarma': {
+        'tipo': 'fabricante', 'mecanica': Lancamento.SELLOUT, 'tags': [],
+        'fabricante': 'Eurofarma', 'filtro': 'EUROFARMA GENERICO', 'escopo_delete': 'mecanica_fabricante',
+    },
+    'sellout_germed': {
+        'tipo': 'fabricante', 'mecanica': Lancamento.SELLOUT, 'tags': [],
+        'fabricante': 'Germed', 'filtro': 'GERMED', 'escopo_delete': 'mecanica_fabricante',
+    },
+    'sellout_prati': {
+        'tipo': 'fabricante', 'mecanica': Lancamento.SELLOUT, 'tags': [],
+        'fabricante': 'Prati', 'filtro': 'PRATI', 'escopo_delete': 'mecanica_fabricante',
+    },
 }
 
 # Filtro manual da promoção Hipzinha (Kimberly) -- ver comentário acima.
@@ -249,14 +321,32 @@ class Command(BaseCommand):
             tags_alvo = {tag_sem_prefixo(t).upper() for t in candidatos['detalhe_desconto'].dropna().unique()}
             df = consultar_venda_por_produtos(inicio, fim, produtos)
             self.stdout.write(f'{nome}: {len(produtos)} produtos com a tag (histórico completo).')
-        else:  # 'produtos' (Supra Corp Day -- lista fixa, sem tag pra descobrir)
+        elif cfg['tipo'] == 'produtos':  # Supra Corp Day -- lista fixa, sem tag pra descobrir
             df = consultar_venda_por_produtos(inicio, fim, filtro)
             tags_alvo = set()
+        else:  # 'promocao_bandeira' (Deu a Louca/Ultra Queimão)
+            # Descoberta com >1 padrão (histórico já usou nomes de caderno
+            # diferentes) -- sempre no histórico completo, mesmo motivo do
+            # Cestões. Depois restringe a 1 bandeira via código de loja.
+            candidatos = pd.concat(
+                [consultar_venda_por_tag(INICIO_PADRAO, hoje, padrao) for padrao in filtro],
+                ignore_index=True,
+            )
+            produtos = sorted(candidatos['embalagem'].dropna().unique())
+            if not produtos:
+                raise CommandError(f'{nome}: nenhum produto com a tag encontrado no banco.')
+            tags_alvo = {tag_sem_prefixo(t).upper() for t in candidatos['detalhe_desconto'].dropna().unique()}
+            codigos_loja = Loja.objects.filter(bandeira=cfg['bandeira']).values_list('codigo', flat=True)
+            df = consultar_venda_por_produtos_e_lojas(inicio, fim, produtos, codigos_loja)
+            self.stdout.write(
+                f'{nome}: {len(produtos)} produtos com a tag (histórico completo), '
+                f'restrito a {len(codigos_loja)} lojas ({cfg["bandeira"]}).'
+            )
         self.stdout.write(f'{nome}: {len(df)} linhas no banco '
                           f'(fabricantes: {", ".join(sorted(df["fabricante"].dropna().unique())) or "-"}).')
 
         if opts['comparar']:
-            self._comparar(nome, mecanica, df, tags_alvo, inicio, fim)
+            self._comparar(nome, mecanica, df, tags_alvo, inicio, fim, fabricante_painel=fabricante)
             return
 
         desde = inicio if opts['dias'] else None
@@ -264,6 +354,7 @@ class Command(BaseCommand):
         resultado = importar_relatorio_fabricante(
             None, mecanica, sorted(tags_alvo), fabricante=fabricante,
             df=df, origem=ORIGEM, desde=desde, classificar_grupo=classificar_grupo,
+            escopo_delete=cfg.get('escopo_delete', 'mecanica'),
         )
         self.stdout.write(self.style.SUCCESS(
             f"{nome}: {resultado['importados']} lançamentos gravados "
@@ -280,7 +371,7 @@ class Command(BaseCommand):
                 f'Verba: valor_apurado atualizado em {len(verbas)} mês(es) (VerbaMensal, mecânica leve3).'
             ))
 
-    def _comparar(self, nome, mecanica, df, tags_alvo, inicio, fim):
+    def _comparar(self, nome, mecanica, df, tags_alvo, inicio, fim, fabricante_painel=None):
         lojas = set(Loja.objects.values_list('codigo', flat=True))
         banco = defaultdict(lambda: defaultdict(float))
         for linha in df.itertuples(index=False):
@@ -299,6 +390,10 @@ class Command(BaseCommand):
         # data por linha, só o mês; filtrar por 'data' excluiria elas inteiras.
         mes_inicio, mes_fim = f'{inicio:%Y-%m}', f'{fim - timedelta(days=1):%Y-%m}'
         qs = Lancamento.objects.filter(mecanica=mecanica, ano_mes__gte=mes_inicio, ano_mes__lte=mes_fim)
+        if fabricante_painel is not None:
+            # Sellout: 1 mecânica, 4 fabricantes -- sem isso a comparação
+            # somaria os outros 3 fabricantes junto, mesmo só conferindo 1.
+            qs = qs.filter(fabricante=fabricante_painel)
         for r in qs.values('ano_mes', 'grupo').annotate(i=Sum('itens'), v=Sum('venda'), c=Sum('custo')):
             p = painel[r['ano_mes']]
             p['itens'] += float(r['i']); p['venda'] += float(r['v']); p['custo'] += float(r['c'])

@@ -142,6 +142,11 @@ def importar_relatorio_fabricante(
     filtro_delete = {'mecanica': mecanica}
     if escopo_delete == 'arquivo':
         filtro_delete['arquivo_origem'] = nome_origem
+    elif escopo_delete == 'mecanica_fabricante':
+        # Sellout: mecânica única (Lancamento.SELLOUT) com 4 fabricantes
+        # (EMS/Eurofarma/Germed/Prati) coexistindo -- reimportar 1 não pode
+        # apagar os outros 3.
+        filtro_delete['fabricante'] = fabricante
     if desde is not None:
         filtro_delete['data__gte'] = desde
     with transaction.atomic():

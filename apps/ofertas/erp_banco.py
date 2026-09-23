@@ -148,3 +148,17 @@ def consultar_venda_por_produtos(inicio: date, fim: date, produtos) -> pd.DataFr
     `consultar_venda_por_tag`), 2ª passada traz o histórico COMPLETO
     desses produtos, dentro ou fora da tag (docx, seção 5.4)."""
     return _executar_consulta(inicio, fim, 'e.descricao = ANY(%(produtos)s)', produtos=list(produtos))
+
+
+def consultar_venda_por_produtos_e_lojas(inicio: date, fim: date, produtos, codigos_loja) -> pd.DataFrame:
+    """Como `consultar_venda_por_produtos`, mas também restrito a uma lista
+    de códigos de loja -- pra Deu a Louca/Ultra Queimão (23/09/26): a
+    promoção é restrita a 1 bandeira, e o próprio código da loja já resolve
+    isso (`Loja.objects.filter(bandeira=...)`, sem precisar de heurística
+    no banco). `unidadenegocio.codigo` no ERP vem com zero à esquerda
+    ('02', '03'...) -- diferente do `Loja.codigo` do painel (sem padding,
+    '2', '3'...), daí o `zfill(2)` antes de comparar."""
+    return _executar_consulta(
+        inicio, fim, 'e.descricao = ANY(%(produtos)s) AND u.codigo = ANY(%(codigos)s)',
+        produtos=list(produtos), codigos=[str(c).zfill(2) for c in codigos_loja],
+    )
