@@ -25,7 +25,7 @@ from .models import Lancamento
 
 def importar_relatorio_fabricante(
     caminho, mecanica: str, tag_alvo: str | list[str], fabricante: str | None, escopo_delete: str = 'mecanica',
-    df=None, origem: str | None = None, desde=None,
+    df=None, origem: str | None = None, desde=None, classificar_grupo=None,
 ) -> dict:
     """`escopo_delete='mecanica'` (padrão, Kenvue/Principia/Botica): cada
     import é um baseline completo, apaga a mecânica inteira antes de
@@ -51,7 +51,12 @@ def importar_relatorio_fabricante(
     `erp_banco.consultar_venda_por_item`), `origem` = rótulo gravado em
     `arquivo_origem` (ex. 'banco') e, opcional, `desde` = data inicial de
     uma atualização incremental: só apaga/recria lançamentos da mecânica
-    com `data >= desde`, preservando o histórico anterior."""
+    com `data >= desde`, preservando o histórico anterior.
+
+    `classificar_grupo`: função opcional `(linha) -> grupo` que substitui
+    a classificação por tag -- só o Kimberly usa (23/09/26): não tem tag
+    limpa pra promoção Hipzinha no ERP, "oferta" é um filtro manual
+    (produto/venda máxima/janela de data), não uma tag."""
     tags_alvo = {tag_alvo.upper()} if isinstance(tag_alvo, str) else {t.upper() for t in tag_alvo}
 
     if df is None:
@@ -95,10 +100,13 @@ def importar_relatorio_fabricante(
         # outra tag/campanha — porque a pergunta de negócio é "o produto
         # vendeu mais dentro ou fora dessa promoção", não "vendeu mais em
         # preço cheio ou nesta promoção".
-        grupo = (
-            Lancamento.GRUPO_OFERTA if tag_limpa.upper() in tags_alvo
-            else Lancamento.GRUPO_BASE
-        )
+        if classificar_grupo is not None:
+            grupo = classificar_grupo(linha)
+        else:
+            grupo = (
+                Lancamento.GRUPO_OFERTA if tag_limpa.upper() in tags_alvo
+                else Lancamento.GRUPO_BASE
+            )
 
         codigo = codigo_loja(linha[col_loja])
         loja = lojas.get(codigo)

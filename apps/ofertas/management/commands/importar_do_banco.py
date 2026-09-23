@@ -22,7 +22,10 @@ fabricante do banco não serve -- genéricos de laboratórios diferentes
 com o MESMO nome de produto entre eles, o painel precisa do cadastro
 `apps.produtos` pra bater com o rótulo curto que `calcular_impacto_
 leve3_fabricante`/Sellout usam, ex. "EMS"/"Eurofarma", não "EMS GENERICO
-S/A" como o ERP chama)."""
+S/A" como o ERP chama); `'kimberly'` -- 1 fabricante só (como `'fabricante'`),
+mas sem tag limpa pra oferta no ERP (achado antigo, não documentado no
+docx) -- "oferta" é um filtro MANUAL (produto/venda máxima/janela de
+data) aplicado linha a linha via `classificar_grupo`, não por tag."""
 from __future__ import annotations
 
 from collections import defaultdict
@@ -116,7 +119,40 @@ MECANICAS = {
         'tipo': 'leve3', 'mecanica': Lancamento.LEVE3, 'fabricante': None,
         'filtro': '%LEVE 3%',
     },
+    # 5º tipo: 1 fabricante só, mas sem tag de oferta limpa -- "Hipzinha" é
+    # curadoria manual (docstring de `importar_kimberly` antigo). Achado
+    # (23/09/26): o banco tem "KIMBERLY CLARK KENKO", "KLABIN KIMBERLY S/A"
+    # e "KLABIN KIMBERLY SA" -- só o 1º tem venda no ano inteiro (os outros
+    # 2, zero linhas jan-set/26), então nome exato sem "%" já resolve sem
+    # precisar de lista. Filtro validado em 22/09/26 (backfill que bateu
+    # exato com os 35 registros manuais de antes): produto contém
+    # "HIPZINHA", venda da linha <= R$60, 27/07 a 02/08/2026.
+    'kimberly': {
+        'tipo': 'kimberly', 'mecanica': Lancamento.KIMBERLY, 'tags': [],
+        'fabricante': 'Kimberly Clark', 'filtro': 'KIMBERLY CLARK KENKO',
+    },
 }
+
+# Filtro manual da promoção Hipzinha (Kimberly) -- ver comentário acima.
+HIPZINHA_PRODUTO = 'HIPZINHA'
+HIPZINHA_VENDA_MAX = 60
+HIPZINHA_INICIO = date(2026, 7, 27)
+HIPZINHA_FIM = date(2026, 8, 2)
+
+
+def _classificar_hipzinha(linha) -> str:
+    produto = str(linha['embalagem'] or '')
+    if HIPZINHA_PRODUTO not in produto.upper():
+        return ''
+    venda = linha['venda']
+    if venda is not None and float(venda) > HIPZINHA_VENDA_MAX:
+        return ''
+    data = linha['data']
+    if hasattr(data, 'date'):
+        data = data.date()
+    if data is None or not (HIPZINHA_INICIO <= data <= HIPZINHA_FIM):
+        return ''
+    return Lancamento.GRUPO_OFERTA
 INICIO_PADRAO = date(2026, 1, 1)
 ORIGEM = 'banco'
 
@@ -166,7 +202,7 @@ class Command(BaseCommand):
             fim = opts['fim'] or hoje
 
         self.stdout.write(f'{nome}: consultando o banco de {inicio:%d/%m/%Y} até {fim - timedelta(days=1):%d/%m/%Y}...')
-        if cfg['tipo'] == 'fabricante':
+        if cfg['tipo'] in ('fabricante', 'kimberly'):
             df = consultar_venda_por_item(inicio, fim, filtro)
             tags_alvo = {cfg['tags'].upper()} if isinstance(cfg['tags'], str) else {t.upper() for t in cfg['tags']}
         elif cfg['tipo'] in ('tag', 'leve3'):
@@ -205,9 +241,10 @@ class Command(BaseCommand):
             return
 
         desde = inicio if opts['dias'] else None
+        classificar_grupo = _classificar_hipzinha if cfg['tipo'] == 'kimberly' else None
         resultado = importar_relatorio_fabricante(
             None, mecanica, sorted(tags_alvo), fabricante=fabricante,
-            df=df, origem=ORIGEM, desde=desde,
+            df=df, origem=ORIGEM, desde=desde, classificar_grupo=classificar_grupo,
         )
         self.stdout.write(self.style.SUCCESS(
             f"{nome}: {resultado['importados']} lançamentos gravados "
