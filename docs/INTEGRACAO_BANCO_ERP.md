@@ -81,7 +81,8 @@ Como rodar (PowerShell, na pasta `painel-ofertas`, sem precisar ativar o venv):
 | Leve 3 | ✅ 0,00% em maio/junho/agosto, diferenças pequenas nos meses de borda | ✅ Sim — 4.743 lançamentos, dados até 22/09 |
 | Kimberly | ✅ 0,00% em jan-ago, filtro manual Hipzinha validado (35 linhas/R$2.095,50) | ✅ Sim — 11.691 lançamentos, dados até 22/09 |
 | Supra Corp | ✅ 0,00% em agosto | ✅ Sim — 998 lançamentos, jan-set/26 (planilha só tinha ago/set) |
-| Deu a Louca/Ultra Queimão, Sellout | não configuradas ainda | ❌ |
+| Sellout (EMS/Eurofarma/Germed/Prati) | Germed/Prati 0,00%; EMS/Eurofarma maiores no banco (planilha truncada, ver nota) | ✅ Sim — 69.019+65.451+32.293+61.169 lançamentos, dados até 22/09 |
+| Deu a Louca/Ultra Queimão | ⚠️ oferta 0,00%, base 5-12x maior — **BLOQUEADO**, ver nota abaixo | ❌ Não (aguardando o Gabriel) |
 
 **Botica — achado e decisão (23/09/26):** o banco tem 4 fabricantes que batem
 `%BOTICA%`/relacionados: `BOTICA`, `BOTICA LA PIEL`, `SIAGE EUDORA`, `VULT`.
@@ -182,13 +183,56 @@ vendem fora de evento também, sem problema — `JANELAS_SUPRACORP` só
 define janela pros meses com evento, cálculo de impacto é por mês).
 Gravado: 998 lançamentos.
 
+**Sellout — achado e decisão (23/09/26):** 8º tipo, variante de
+`'fabricante'` sem split oferta/base (é referência de giro pro impacto do
+Leve3, `tags: []`). **Achado real:** cada marca tem várias variações de
+fabricante no ERP (ex. `EMS`, `EMS GENERICO S/A`, `EMS SIGMA`) —
+resolvido batendo os produtos já canônicos do cadastro `apps.produtos`
+(usados no Leve3) contra o fabricante real deles no banco: todos caem em
+`EMS GENERICO S/A` (idem Eurofarma → `EUROFARMA GENERICO`; Germed/Prati
+sem variação, nome exato mesmo). `escopo_delete='mecanica_fabricante'`
+novo em `importar_relatorio_fabricante` — 1 mecânica (`SELLOUT`), 4
+fabricantes coexistindo, reimportar 1 não apaga os outros 3. Validado:
+Germed/Prati batem 0,00% quase todo mês; EMS/Eurofarma ficam 10-36%
+MAIORES no banco — confirma o achado já documentado (22/09/26: a
+planilha antiga batia no teto de 65.536 linhas do Excel, dado truncado;
+o banco corrige isso de graça). Gravado: 69.019 (EMS) + 65.451
+(Eurofarma) + 32.293 (Germed) + 61.169 (Prati) lançamentos.
+
+**Deu a Louca/Ultra Queimão — investigado, BLOQUEADO PRA GRAVAÇÃO
+(23/09/26):** tentativa de tipo `'promocao_bandeira'` (como Cestões, mas
+restrito a 1 bandeira via código de loja — `consultar_venda_por_
+produtos_e_lojas` nova). `--comparar` mostra "oferta" batendo 0,00%
+exato (a identificação da tag está certa — achado à parte, cuidado:
+histórico do ERP tem cadernos "QUEIMA DE ESTOQUE"/"QUEIMÃO INAUGURAÇÃO
+DERMO JAGUAQUARA" de 2024/2025, evento de loja diferente, que bateriam
+num padrão `%QUEIM%` largo demais — confirmado que nenhum tem venda em
+2026, sem risco na prática). Mas "base" fica 5-12x maior que a planilha
+em todo mês. Investigado a fundo: os arquivos que o Gabriel mandou pra
+jun-ago (`deu a louca ano - com loja.xls`) vieram JÁ FILTRADOS só com
+linhas de oferta (100% grupo=oferta nesses 3 meses, achado documentado
+em 17/09/26 — não tinham base nenhuma pra comparar); o único mês com
+base real (set/26, arquivo "detalhe") tem só 105 produtos, MENOS que os
+194 que a própria tag já revela no histórico completo — ou seja, nem
+"produtos que já tiveram a tag" (mesma lógica do Cestões) bate com o
+recorte real que ele historicamente comparou. `importar_promocao_
+bandeira` (código antigo) documenta "base = todo o resto do portfólio
+da bandeira", mas isso nunca foi exportado de verdade — o catálogo
+INTEIRO de 1 bandeira seria centenas de milhares de linhas/mês.
+**Não implementado — falta perguntar ao Gabriel** o que define o recorte
+de "base" que ele quer pra essas 2 mecânicas antes de gravar qualquer
+coisa. Código novo (`consultar_venda_por_produtos_e_lojas`, tipo
+`'promocao_bandeira'` em `importar_do_banco.py`) já existe e funciona
+pra descoberta/comparação, só falta decidir o escopo certo.
+
 Backup do painel antes da 1ª gravação: `db.sqlite3.bak-antes-banco`
 (para voltar: fechar o painel e copiar esse arquivo por cima de `db.sqlite3`).
 
 ## Próximos passos
 
 1. **Conferir o painel** (telas Kenvue, Principia, Botica, Procter,
-   Marketing, Cestões, Leve 3, Kimberly e Supra Corp, já gravadas do banco).
+   Marketing, Cestões, Leve 3, Kimberly, Supra Corp e Sellout, já
+   gravadas do banco).
 2. ~~Botica~~ — resolvido, ver nota acima (grupo Botica+Siage+Vult, gravado).
 3. ~~Procter~~ — resolvido, ver nota acima (2 campanhas numa consulta só via
    `tag_alvo` em lista, `PROCTER FARMA` fica de fora, gravado).
@@ -202,6 +246,17 @@ Backup do painel antes da 1ª gravação: `db.sqlite3.bak-antes-banco`
    `classificar_grupo` pro filtro manual da Hipzinha, gravado).
 3f. ~~Supra Corp~~ — resolvido, ver nota acima (tipo `'produtos'` novo,
    lista fixa de 5 SKUs, gravado).
+3g. ~~Sellout~~ — resolvido, ver nota acima (tipo `'fabricante'` sem
+   oferta/base, `escopo_delete='mecanica_fabricante'` novo, 4 fabricantes
+   gravados, EMS/Eurofarma corrigem o truncamento do Excel antigo).
+3h. **Deu a Louca/Ultra Queimão — BLOQUEADO, ver nota acima.** Pergunta
+   pro Gabriel: o que define quais produtos/lojas entram na comparação
+   "base" dessas 2 mecânicas? (a) todo o catálogo da bandeira (centenas
+   de milhares de linhas/mês — viável só via banco, nunca foi exportado
+   assim); (b) só os ~200 produtos que já apareceram na tag alguma vez
+   (testado, dá 5-12x mais venda que a planilha); (c) outro recorte
+   específico que ele aplica na hora de exportar do ERP (categoria,
+   departamento?) que não dá pra inferir só pelos dados.
 4. ~~Botão "Atualizar agora"~~ — resolvido (23/09/26): botão no menu
    "Sistema" do painel, `views.atualizar_agora` roda `importar_do_banco
    todas --dias 7` na hora e mostra mensagem de sucesso/erro.
@@ -213,9 +268,9 @@ Backup do painel antes da 1ª gravação: `db.sqlite3.bak-antes-banco`
    pelo modo automático do Claude Code por mudar o sistema — ver instrução
    deixada pro Gabriel rodar com `!` ou pelo Agendador de Tarefas na UI).
    O computador precisa estar ligado no horário.
-6. Demais mecânicas (Deu a Louca/Ultra Queimão, Sellout), uma a uma,
-   sempre com `--comparar` antes de gravar. Cadernos de
-   oferta, produtos e itens de caderno também estão no banco
+6. **Todas as 9 ações + Sellout já passaram pelo banco** (8 gravadas, 1
+   bloqueada aguardando o Gabriel — item 3h). Cadernos de oferta,
+   produtos e itens de caderno também estão no banco
    (`cadernooferta`, `itemcadernooferta`,
    `unidadenegocioparticipantecadernooferta`) — dá pra substituir
    planilhas de cadastro no futuro.
