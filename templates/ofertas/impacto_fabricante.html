@@ -4,11 +4,12 @@
 {% block conteudo %}
 
 <h2>Oferta {{ fabricante_rotulo }}</h2>
-{% if not campanhas_com_rebaixa %}
+{% if not tem_formula_verba %}
 <p style="color:var(--muted); font-size:13.5px; margin-top:-8px;">
   Mecânica de verba pendente de definição (docx, seção 5.3) — esta tela mostra só volume/venda/margem.
 </p>
-{% else %}
+{% endif %}
+{% if campanhas_com_rebaixa %}
   <p style="margin:-8px 0 6px;">
     <a href="#apuracao-industria" style="color:var(--accent); font-size:12.5px; text-decoration:none;">↓ Apuração para a indústria</a>
   </p>
@@ -28,6 +29,9 @@
   <div class="card"><div class="rotulo">Margem na oferta</div><div class="valor">{{ kpis.margem_oferta_pct|numero:1 }}%</div></div>
   <div class="card"><div class="rotulo">CMV % sem verba</div><div class="valor">{{ kpis.cmv_pct_sem_verba|numero:1 }}%</div></div>
   <div class="card"><div class="rotulo">CMV % com verba</div><div class="valor">{% if kpis.cmv_pct_com_verba is not None %}{{ kpis.cmv_pct_com_verba|numero:1 }}%{% else %}<span class="vazio" title="Sem fórmula de verba definida ainda">—</span>{% endif %}</div></div>
+  {% if kpis.investimento_oferta is not None %}
+  <div class="card"><div class="rotulo">Investimento a reembolsar</div><div class="valor">{{ kpis.investimento_oferta|brl }}</div></div>
+  {% endif %}
   <div class="card">
     <div class="rotulo">Crescimento na oferta</div>
     <div class="valor">

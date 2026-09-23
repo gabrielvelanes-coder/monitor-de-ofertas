@@ -603,7 +603,7 @@ def serie_diaria(queryset, mes: str | None = None) -> dict:
     return {'periodos': periodos}
 
 
-def calcular_impacto_fabricante(queryset, busca: str = '', queryset_baseline=None):
+def calcular_impacto_fabricante(queryset, busca: str = '', queryset_baseline=None, percentual_verba=None):
     """Oferta por fabricante — Kenvue/Principia/Botica/Procter (docx, seção
     5.3): compara volume/venda/margem da promoção do fabricante (oferta —
     tag exata) com todo o resto das vendas dele, incluindo "Sem Desconto"
@@ -613,7 +613,16 @@ def calcular_impacto_fabricante(queryset, busca: str = '', queryset_baseline=Non
     mês (pra "% crescimento" poder olhar os 3 meses ANTES do mês da oferta,
     mesmo com um mês específico selecionado na tela — sem isso, o cálculo
     ficaria sem dado nenhum de meses anteriores). Quando omitido, cai pra
-    comparar com o resto do PRÓPRIO mês (comportamento anterior, 22/09)."""
+    comparar com o resto do PRÓPRIO mês (comportamento anterior, 22/09).
+
+    `percentual_verba` (opcional, ex. `Decimal('0.20')` pra Principia,
+    confirmado pelo Gabriel 23/09: "principia é 20% sobre o custo do
+    produto, esse é o investimento da industria") -- quando informado,
+    calcula `investimento_oferta` linha a linha (`custo × percentual`,
+    só nas linhas `grupo=oferta`) igual ao padrão já usado no Leve3
+    (`calcular_leve3`), habilitando CMV com verba nas tabelas de loja/
+    produto/campanha, não só no card agregado. Kenvue/Botica/Procter ainda
+    não têm fórmula (`None`) -- fica tudo igual a antes pra eles."""
     linhas = queryset.select_related('loja').values(
         'loja_id', 'loja__codigo', 'loja__bandeira', 'produto_descricao',
         'grupo', 'tag_origem', 'ano_mes', 'data', 'itens', 'venda', 'custo', 'lucro',
@@ -635,6 +644,7 @@ def calcular_impacto_fabricante(queryset, busca: str = '', queryset_baseline=Non
     # linha), não mistura o investimento das duas. Quando só existe 1 tag de
     # oferta, isso vira uma tabela de 1 linha só (a tela esconde nesse caso).
     por_campanha = defaultdict(lambda: {'itens_oferta': ZERO, 'venda_oferta': ZERO, 'lucro_oferta': ZERO})
+    total_investimento = ZERO
     por_campanha_mes = defaultdict(lambda: defaultdict(lambda: ZERO))
     # "% crescimento" (pedido pelo Gabriel, 22/09): venda média por DIA
     # durante a oferta vs. venda média por dia no resto do mês (mesma
@@ -674,6 +684,9 @@ def calcular_impacto_fabricante(queryset, busca: str = '', queryset_baseline=Non
         if grupo == Lancamento.GRUPO_OFERTA:
             if linha['data']:
                 dias_oferta_por_mes[linha['ano_mes']].add(linha['data'])
+
+            investimento = (custo * percentual_verba) if percentual_verba is not None else None
+
             loja = por_loja[linha['loja_id']]
             loja['codigo'] = linha['loja__codigo']
             loja['bandeira'] = linha['loja__bandeira']
@@ -693,6 +706,13 @@ def calcular_impacto_fabricante(queryset, busca: str = '', queryset_baseline=Non
             campanha['venda_oferta'] += venda
             campanha['lucro_oferta'] += lucro
             por_campanha_mes[nome_campanha][linha['ano_mes']] += venda
+
+            if investimento is not None:
+                total_investimento += investimento
+                mes['investimento_oferta'] = mes.get('investimento_oferta', ZERO) + investimento
+                loja['investimento_oferta'] = loja.get('investimento_oferta', ZERO) + investimento
+                produto['investimento_oferta'] = produto.get('investimento_oferta', ZERO) + investimento
+                campanha['investimento_oferta'] = campanha.get('investimento_oferta', ZERO) + investimento
 
     def _margem_pct(g):
         venda = totais[g]['venda']
@@ -772,6 +792,7 @@ def calcular_impacto_fabricante(queryset, busca: str = '', queryset_baseline=Non
             list(por_produto.keys()),
             {mes: valores['venda_oferta'] for mes, valores in por_mes.items()},
         ),
+        'investimento_oferta': total_investimento if percentual_verba is not None else None,
     }
 
     produtos = [
@@ -792,7 +813,7 @@ def calcular_impacto_fabricante(queryset, busca: str = '', queryset_baseline=Non
         'por_mes': por_mes_lista,
         'ranking_lojas': sorted(por_loja.values(), key=lambda l: l['venda_oferta'], reverse=True),
         'ranking_bandeiras': agrupar_por_bandeira(
-            por_loja.values(), ['itens_oferta', 'venda_oferta', 'lucro_oferta']
+            por_loja.values(), ['itens_oferta', 'venda_oferta', 'lucro_oferta', 'investimento_oferta']
         ),
         'produtos': produtos,
         'series_produtos': alinhar_com_labels(por_produto_mes, labels),

@@ -5,6 +5,7 @@ from django.core.management.base import BaseCommand
 from apps.ofertas.erp import encontrar_arquivo
 from apps.ofertas.importadores import importar_relatorio_fabricante
 from apps.ofertas.models import Lancamento
+from apps.verba.services import sincronizar_verba_percentual_custo
 
 
 class Command(BaseCommand):
@@ -33,3 +34,5 @@ class Command(BaseCommand):
             self.stdout.write(self.style.WARNING(
                 f"Lojas sem cadastro (linhas ignoradas): {', '.join(sorted(resultado['lojas_sem_cadastro']))}."
             ))
+
+        sincronizar_verba_percentual_custo(Lancamento.PRINCIPIA)

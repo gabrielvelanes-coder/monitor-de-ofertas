@@ -5,7 +5,9 @@ from django.shortcuts import render
 
 from apps.lojas.models import Loja
 from apps.produtos.models import RebaixaProduto
-from apps.verba.services import anexar_cmv, cmv_pct, cmv_pct_com_verba, verba_apurada
+from apps.verba.services import (
+    PERCENTUAL_VERBA_FABRICANTE, anexar_cmv, cmv_pct, cmv_pct_com_verba, verba_apurada,
+)
 
 from .apuracao import (
     escrever_excel_apuracao, gerar_dataframe_apuracao, nome_arquivo_apuracao,
@@ -331,10 +333,14 @@ def impacto_fabricante(request, fabricante):
         RebaixaProduto.objects.filter(mecanica=mecanica).values_list('campanha', flat=True).distinct()
     )
 
+    percentual_verba = PERCENTUAL_VERBA_FABRICANTE.get(mecanica)
+
     queryset = queryset_sem_mes
     if mes:
         queryset = queryset.filter(ano_mes=mes)
-    dados = calcular_impacto_fabricante(queryset, busca=busca, queryset_baseline=queryset_sem_mes)
+    dados = calcular_impacto_fabricante(
+        queryset, busca=busca, queryset_baseline=queryset_sem_mes, percentual_verba=percentual_verba,
+    )
     grafico = grafico_mensal(dados['por_mes'], [
         ('venda_base', 'Venda base'), ('venda_oferta', 'Venda oferta'),
         ('itens_base', 'Itens base', 'unidades'), ('itens_oferta', 'Itens oferta', 'unidades'),
@@ -343,20 +349,27 @@ def impacto_fabricante(request, fabricante):
     apuracao_resumo = resumo_apuracao_industria(mecanica, campanhas_com_rebaixa, ano_mes=mes)
     apuracao_total = sum((r['investimento'] for r in apuracao_resumo), ZERO)
 
-    # CMV geral (base + oferta) com/sem verba — com_verba fica None pros 4
-    # fabricantes hoje (sem fórmula de apuração ainda, ver PLANO_VERBA.md);
-    # o template mostra "—" em vez de R$0/0% mudo. Nas tabelas de loja/
-    # produto usa só a fatia "oferta" (venda_oferta/lucro_oferta) — "base"
-    # não é a promoção, misturar dilui o que a tabela quer mostrar.
+    # CMV geral (base + oferta) com/sem verba. Fabricante com fórmula
+    # própria (`percentual_verba`, hoje só Principia) usa o investimento já
+    # calculado linha a linha pro recorte atual (mesmo padrão do Leve3) --
+    # os outros 3 (sem fórmula ainda, ver PLANO_VERBA.md) caem pro agregado
+    # de VerbaMensal (`verba_apurada`, sempre None enquanto ninguém
+    # cadastrar `valor_apurado` manual), e o template mostra "—" em vez de
+    # R$0/0% mudo. Nas tabelas de loja/produto usa só a fatia "oferta"
+    # (venda_oferta/lucro_oferta) — "base" não é a promoção, misturar dilui
+    # o que a tabela quer mostrar.
     venda_total = dados['kpis']['venda_base'] + dados['kpis']['venda_oferta']
     lucro_total = dados['kpis']['lucro_base'] + dados['kpis']['lucro_oferta']
-    dados['kpis']['cmv_pct_sem_verba'] = cmv_pct(venda_total, lucro_total)
-    dados['kpis']['cmv_pct_com_verba'] = cmv_pct_com_verba(
-        venda_total, lucro_total, verba_apurada(mecanica, mes)
+    investimento_kpi = (
+        dados['kpis']['investimento_oferta'] if percentual_verba is not None
+        else verba_apurada(mecanica, mes)
     )
-    anexar_cmv(dados['ranking_lojas'], 'venda_oferta', 'lucro_oferta')
-    anexar_cmv(dados['ranking_bandeiras'], 'venda_oferta', 'lucro_oferta')
-    anexar_cmv(dados['produtos'], 'venda_oferta', 'lucro_oferta')
+    dados['kpis']['cmv_pct_sem_verba'] = cmv_pct(venda_total, lucro_total)
+    dados['kpis']['cmv_pct_com_verba'] = cmv_pct_com_verba(venda_total, lucro_total, investimento_kpi)
+    campo_verba = 'investimento_oferta' if percentual_verba is not None else None
+    anexar_cmv(dados['ranking_lojas'], 'venda_oferta', 'lucro_oferta', campo_verba)
+    anexar_cmv(dados['ranking_bandeiras'], 'venda_oferta', 'lucro_oferta', campo_verba)
+    anexar_cmv(dados['produtos'], 'venda_oferta', 'lucro_oferta', campo_verba)
 
     contexto = {
         'secao': f'fabricante_{fabricante}',
@@ -369,6 +382,11 @@ def impacto_fabricante(request, fabricante):
         'mes_atual': mes,
         'tem_multiplas_campanhas': tem_multiplas_campanhas,
         'campanhas_com_rebaixa': campanhas_com_rebaixa,
+        # Aviso "verba pendente de definição" não pode olhar só
+        # `campanhas_com_rebaixa` (isso é só o cadastro de rebaixa por EAN,
+        # usado pro arquivo de apuração) -- Principia tem fórmula (20% do
+        # custo) sem depender de rebaixa nenhuma, ver `PERCENTUAL_VERBA_FABRICANTE`.
+        'tem_formula_verba': percentual_verba is not None or bool(campanhas_com_rebaixa),
         'apuracao_resumo': apuracao_resumo,
         'apuracao_total': apuracao_total,
         'grafico': grafico,

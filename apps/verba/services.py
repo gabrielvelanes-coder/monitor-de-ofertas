@@ -9,12 +9,23 @@ from __future__ import annotations
 
 from decimal import Decimal
 
+from django.db.models import Sum
+
 from apps.ofertas.models import Lancamento
 from apps.ofertas.services import calcular_leve3
 
 from .models import VerbaMensal
 
 ZERO = Decimal('0')
+
+# Fórmulas de verba confirmadas com o Gabriel por fabricante (23/09/26) --
+# % fixo sobre o custo dos itens vendidos na oferta (`grupo=oferta`).
+# Diferente de Kenvue/Procter (rebaixa por EAN, `RebaixaProduto`, valor já
+# vem pronto do fabricante) -- aqui é só 1 percentual, sem tabela nenhuma.
+# Botica ainda sem regra (Gabriel vai mandar as regras já usadas em 2026).
+PERCENTUAL_VERBA_FABRICANTE = {
+    Lancamento.PRINCIPIA: Decimal('0.20'),
+}
 
 
 def sincronizar_verba_leve3(ano_mes: str | None = None) -> list[VerbaMensal]:
@@ -37,6 +48,34 @@ def sincronizar_verba_leve3(ano_mes: str | None = None) -> list[VerbaMensal]:
         dados = calcular_leve3(queryset.filter(ano_mes=mes))
         verba, _ = VerbaMensal.objects.get_or_create(mecanica=Lancamento.LEVE3, ano_mes=mes)
         verba.valor_apurado = dados['kpis']['investimento']
+        verba.apuracao_automatica = True
+        verba.save(update_fields=['valor_apurado', 'apuracao_automatica', 'atualizado_em'])
+        atualizados.append(verba)
+    return atualizados
+
+
+def sincronizar_verba_percentual_custo(mecanica: str, ano_mes: str | None = None) -> list[VerbaMensal]:
+    """Fórmula de verba simples (% fixo sobre o custo dos itens vendidos na
+    oferta, `PERCENTUAL_VERBA_FABRICANTE`) -- hoje só Principia (20%,
+    confirmado 23/09/26: "principia é 20% sobre o custo do produto, esse é
+    o investimento da industria"). Mesmo padrão de `sincronizar_verba_leve3`
+    (1 VerbaMensal por mês, nunca toca valor_recebido/data_recebimento/
+    status/observação). Não faz nada (lista vazia) se a mecânica não tiver
+    percentual definido em `PERCENTUAL_VERBA_FABRICANTE`."""
+    percentual = PERCENTUAL_VERBA_FABRICANTE.get(mecanica)
+    if percentual is None:
+        return []
+
+    queryset = Lancamento.objects.filter(mecanica=mecanica, grupo=Lancamento.GRUPO_OFERTA)
+    if ano_mes:
+        queryset = queryset.filter(ano_mes=ano_mes)
+
+    meses = sorted(set(queryset.values_list('ano_mes', flat=True)))
+    atualizados = []
+    for mes in meses:
+        total_custo = queryset.filter(ano_mes=mes).aggregate(total=Sum('custo'))['total'] or ZERO
+        verba, _ = VerbaMensal.objects.get_or_create(mecanica=mecanica, ano_mes=mes)
+        verba.valor_apurado = total_custo * percentual
         verba.apuracao_automatica = True
         verba.save(update_fields=['valor_apurado', 'apuracao_automatica', 'atualizado_em'])
         atualizados.append(verba)
