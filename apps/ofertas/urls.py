@@ -14,4 +14,5 @@ urlpatterns = [
     path('marketing/', views.marketing, name='marketing'),
     path('kimberly/', views.kimberly, name='kimberly'),
     path('apuracao/<str:mecanica>/', views.exportar_apuracao, name='exportar_apuracao'),
+    path('atualizar/', views.atualizar_agora, name='atualizar_agora'),
 ]

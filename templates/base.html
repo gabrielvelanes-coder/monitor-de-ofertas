@@ -42,6 +42,20 @@
     }
     nav a:hover { background: var(--accent-bg); }
     nav a.ativo { background: var(--accent); color: #0e1116; font-weight: 600; }
+    .form-atualizar { margin-top: 4px; }
+    .form-atualizar button {
+      width: 100%; text-align: left; padding: 7px 10px; border-radius: 7px;
+      font-size: 13.8px; font-family: inherit; text-transform: uppercase;
+      background: none; color: var(--text); border: none; cursor: pointer;
+    }
+    .form-atualizar button:hover { background: var(--accent-bg); }
+    .mensagens { margin-bottom: 18px; }
+    .mensagens li {
+      list-style: none; padding: 10px 14px; border-radius: 8px; font-size: 13.5px;
+      margin-bottom: 8px; border: 1px solid var(--border);
+    }
+    .mensagens li.success { background: #10321f; border-color: #1f6b3f; color: #7fd99e; }
+    .mensagens li.error { background: #3a1414; border-color: #6b1f1f; color: #f08b8b; }
 
     .conteudo { flex: 1; min-width: 0; }
     .barra-topo {
@@ -143,6 +157,10 @@
 
         <div class="grupo-titulo">Sistema</div>
         <a href="/admin/">Admin</a>
+        <form method="post" action="{% url 'ofertas:atualizar_agora' %}" class="form-atualizar">
+          {% csrf_token %}
+          <button type="submit">Atualizar agora</button>
+        </form>
       </nav>
     </aside>
 
@@ -170,6 +188,11 @@
         </form>
       </div>
       <main>
+        {% if messages %}
+          <ul class="mensagens">
+            {% for m in messages %}<li class="{{ m.tags }}">{{ m }}</li>{% endfor %}
+          </ul>
+        {% endif %}
         {% block conteudo %}{% endblock %}
       </main>
     </div>

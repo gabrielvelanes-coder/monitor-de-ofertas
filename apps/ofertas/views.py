@@ -1,7 +1,10 @@
+import io
 from decimal import Decimal
 
+from django.contrib import messages
+from django.core.management import call_command
 from django.http import Http404, HttpResponse
-from django.shortcuts import render
+from django.shortcuts import redirect, render
 
 from apps.lojas.models import Loja
 from apps.produtos.models import RebaixaProduto
@@ -588,3 +591,23 @@ def exportar_apuracao(request, mecanica):
     resposta['Content-Disposition'] = f'attachment; filename="{nome_arquivo_apuracao(nome_oferta, mes)}"'
     escrever_excel_apuracao(df, dados, nome_oferta, resposta)
     return resposta
+
+
+def atualizar_agora(request):
+    """Botão "Atualizar agora" (menu Sistema) -- roda a mesma atualização
+    incremental do Agendador de Tarefas (`importar_do_banco todas --dias
+    7`), na hora, pra quem não quer esperar até 6h do dia seguinte. Só
+    atualiza as mecânicas já liberadas pro banco (Kenvue/Principia/Botica,
+    ver `importar_do_banco.MECANICAS`) -- as outras continuam só por .xls."""
+    if request.method != 'POST':
+        raise Http404()
+    saida = io.StringIO()
+    try:
+        call_command('importar_do_banco', 'todas', dias=7, stdout=saida, stderr=saida)
+        messages.success(
+            request,
+            'Kenvue, Principia e Botica atualizados do banco do ERP (últimos 7 dias).',
+        )
+    except Exception as exc:
+        messages.error(request, f'Falha ao atualizar do banco: {exc}')
+    return redirect(request.META.get('HTTP_REFERER') or 'ofertas:home')
