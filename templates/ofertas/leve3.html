@@ -50,9 +50,8 @@
     <h3 style="margin-top:0;">Evolução mensal</h3>
     {% if grafico.labels|length <= 1 %}
       <p style="color:var(--muted); font-size:12.5px;">
-        Só {{ grafico.labels|length }} mês selecionado — com 1 ponto só, o gráfico de barra quase não
-        aparece. Os números certos estão nos cards acima; troque o filtro "Mês" pra "Todos os meses"
-        pra ver a evolução de verdade.
+        Só há {{ grafico.labels|length }} mês de dado até agora — o gráfico vira comparação de verdade
+        conforme mais meses forem importados.
       </p>
     {% endif %}
     <canvas id="grafico-leve3"></canvas>

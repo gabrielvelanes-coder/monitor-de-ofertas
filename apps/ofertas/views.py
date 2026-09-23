@@ -42,16 +42,22 @@ PROMOCOES = {
 }
 
 
-def _dados_periodo(queryset_sem_mes, mes):
+def _dados_periodo(queryset_sem_mes):
     """Abas Semana/Dia do gráfico único (pedido 22/09/26 -- "apenas 1
     gráfico... escolher olhar por mês, semana ou dia") -- a aba Mês usa o
     `grafico_mensal` de sempre (drill-down/clique-pra-filtrar), essas 2
     granularidades novas usam o mesmo formato simples do antigo gráfico
     semanal. `tem_semana`/`tem_dia` decidem se a aba aparece — mecânica
     com cobertura parcial de `data` (Leve3, Deu a Louca/Ultra Queimão) pode
-    ficar sem nenhuma semana/dia pro recorte de mês/fabricante escolhido."""
-    semanas = serie_semanal(queryset_sem_mes, mes)['periodos']
-    dias = serie_diaria(queryset_sem_mes, mes)['periodos']
+    ficar sem nenhuma semana/dia pro recorte de fabricante escolhido.
+
+    Sempre o HISTÓRICO COMPLETO, sem filtro de mês (decidido em conversa
+    com o Gabriel, 23/09/26: "o gráfico sempre estou comparando com
+    realizados anteriores... enriqueceria a análise" -- o filtro "Mês" do
+    topo continua controlando cards/tabela, mas o gráfico, nas 3
+    granularidades, sempre mostra tudo pra servir de comparação)."""
+    semanas = serie_semanal(queryset_sem_mes)['periodos']
+    dias = serie_diaria(queryset_sem_mes)['periodos']
     return {
         'dados_periodo': {'semana': semanas, 'dia': dias},
         'tem_semana': bool(semanas),
@@ -180,6 +186,14 @@ def leve3(request):
         queryset = queryset.filter(ano_mes=mes)
 
     dados = calcular_leve3(queryset, busca=busca)
+    # Gráfico e drill-down usam o histórico COMPLETO (`queryset_sem_mes`),
+    # não o recorte de mês da tabela/cards (decidido em conversa com o
+    # Gabriel, 23/09/26: "o gráfico sempre estou comparando com realizados
+    # anteriores... enriqueceria a análise" -- o filtro "Mês" do topo
+    # continua só controlando cards/tabela). `busca` (produto) é mantida
+    # também no gráfico, senão o drill-down mostraria produto fora do
+    # filtro de busca atual.
+    dados_grafico = calcular_leve3(queryset_sem_mes, busca=busca)
     # Venda dividida em 2 séries (Velanes/Ultra Popular) em vez de 1 série
     # só pintada pela bandeira "dominante" do mês -- a versão anterior
     # (dominante) saía sempre laranja/Velanes em TODO mês (Velanes vende
@@ -192,11 +206,11 @@ def leve3(request):
     # motivo da venda acima) -- antes era 1 série cinza só ("Itens"),
     # agnóstica de bandeira.
     grafico = {
-        'labels': [m['ano_mes'] for m in dados['por_mes']],
-        'venda_velanes': [m['venda_velanes'] for m in dados['por_mes']],
-        'venda_ultra_popular': [m['venda_ultra_popular'] for m in dados['por_mes']],
-        'itens_velanes': [m['itens_velanes'] for m in dados['por_mes']],
-        'itens_ultra_popular': [m['itens_ultra_popular'] for m in dados['por_mes']],
+        'labels': [m['ano_mes'] for m in dados_grafico['por_mes']],
+        'venda_velanes': [m['venda_velanes'] for m in dados_grafico['por_mes']],
+        'venda_ultra_popular': [m['venda_ultra_popular'] for m in dados_grafico['por_mes']],
+        'itens_velanes': [m['itens_velanes'] for m in dados_grafico['por_mes']],
+        'itens_ultra_popular': [m['itens_ultra_popular'] for m in dados_grafico['por_mes']],
     }
     # Leve3 não tem `grupo` preenchido (só importa a venda que já é a
     # própria oferta, sem contraparte "base" pra comparar) -- todo período
@@ -205,7 +219,7 @@ def leve3(request):
     # mas sem % (não tem baseline "sem oferta" nenhum pra comparar). Útil
     # pra ver em qual semana cada bandeira rodou o combo, já que Velanes e
     # Ultra Popular giram em semanas diferentes.
-    dados_periodo = _dados_periodo(queryset_sem_mes, mes)
+    dados_periodo = _dados_periodo(queryset_sem_mes)
     impacto_fabricantes = calcular_impacto_leve3_fabricante()
     apuracao_resumo = resumo_apuracao_leve3(ano_mes=mes)
     apuracao_total = sum((r['investimento'] for r in apuracao_resumo), ZERO)
@@ -236,6 +250,10 @@ def leve3(request):
         'apuracao_total': apuracao_total,
         **dados_periodo,
         **dados,
+        # Sobrescreve a série que veio de `dados` (recorte de mês) pela do
+        # histórico completo -- drill-down (clicar num produto) mostra a
+        # evolução inteira dele, não só o(s) ponto(s) do mês filtrado.
+        'series_produtos': dados_grafico['series_produtos'],
     }
     return render(request, 'ofertas/leve3.html', contexto)
 
@@ -246,13 +264,17 @@ def cestoes(request):
     meses = meses_disponiveis(Lancamento.CESTOES)
     mes = mes_da_request(request, Lancamento.CESTOES)
 
-    queryset = filtrar_por_bandeira(
+    queryset_sem_mes = filtrar_por_bandeira(
         Lancamento.objects.filter(mecanica=Lancamento.CESTOES), bandeira
     )
+    queryset = queryset_sem_mes
     if mes:
         queryset = queryset.filter(ano_mes=mes)
     dados = calcular_cestoes(queryset, busca=busca)
-    grafico = grafico_mensal(dados['por_mes'], [
+    # Gráfico com o histórico completo, não só o mês filtrado (decidido
+    # com o Gabriel 23/09/26 — ver comentário igual na view do Leve3).
+    dados_grafico = calcular_cestoes(queryset_sem_mes, busca=busca)
+    grafico = grafico_mensal(dados_grafico['por_mes'], [
         ('venda', 'Venda'), ('itens', 'Itens', 'unidades'),
     ])
     anexar_cmv(dados['ranking_lojas'], 'venda', 'lucro')
@@ -268,6 +290,7 @@ def cestoes(request):
         'mes_atual': mes,
         'grafico': grafico,
         **dados,
+        'series_produtos': dados_grafico['series_produtos'],
     }
     return render(request, 'ofertas/cestoes.html', contexto)
 
@@ -341,11 +364,17 @@ def impacto_fabricante(request, fabricante):
     dados = calcular_impacto_fabricante(
         queryset, busca=busca, queryset_baseline=queryset_sem_mes, percentual_verba=percentual_verba,
     )
-    grafico = grafico_mensal(dados['por_mes'], [
+    # Gráfico e drill-down (produto/campanha) usam o histórico COMPLETO,
+    # não o recorte de mês da tabela/cards (decidido com o Gabriel
+    # 23/09/26 — ver comentário igual na view do Leve3).
+    dados_grafico = calcular_impacto_fabricante(
+        queryset_sem_mes, busca=busca, queryset_baseline=queryset_sem_mes, percentual_verba=percentual_verba,
+    )
+    grafico = grafico_mensal(dados_grafico['por_mes'], [
         ('venda_base', 'Venda base'), ('venda_oferta', 'Venda oferta'),
         ('itens_base', 'Itens base', 'unidades'), ('itens_oferta', 'Itens oferta', 'unidades'),
     ])
-    dados_periodo = _dados_periodo(queryset_sem_mes, mes)
+    dados_periodo = _dados_periodo(queryset_sem_mes)
     apuracao_resumo = resumo_apuracao_industria(mecanica, campanhas_com_rebaixa, ano_mes=mes)
     apuracao_total = sum((r['investimento'] for r in apuracao_resumo), ZERO)
 
@@ -392,6 +421,8 @@ def impacto_fabricante(request, fabricante):
         'grafico': grafico,
         **dados_periodo,
         **dados,
+        'series_produtos': dados_grafico['series_produtos'],
+        'series_campanhas': dados_grafico['series_campanhas'],
     }
     return render(request, 'ofertas/impacto_fabricante.html', contexto)
 
@@ -414,11 +445,15 @@ def impacto_promocao(request, promocao):
     if mes:
         queryset = queryset.filter(ano_mes=mes)
     dados = calcular_impacto_fabricante(queryset, busca=busca)
-    grafico = grafico_mensal(dados['por_mes'], [
+    # Gráfico e drill-down usam o histórico COMPLETO, não o recorte de mês
+    # da tabela/cards (decidido com o Gabriel 23/09/26 — ver comentário
+    # igual na view do Leve3).
+    dados_grafico = calcular_impacto_fabricante(queryset_sem_mes, busca=busca)
+    grafico = grafico_mensal(dados_grafico['por_mes'], [
         ('venda_base', 'Venda base'), ('venda_oferta', 'Venda oferta'),
         ('itens_base', 'Itens base', 'unidades'), ('itens_oferta', 'Itens oferta', 'unidades'),
     ])
-    dados_periodo = _dados_periodo(queryset_sem_mes, mes)
+    dados_periodo = _dados_periodo(queryset_sem_mes)
 
     # Mesma decisão de CMV do impacto_fabricante: sem fórmula de verba
     # definida ainda pra estas 2 promoções, então com_verba fica None (o
@@ -444,6 +479,7 @@ def impacto_promocao(request, promocao):
         'grafico': grafico,
         **dados_periodo,
         **dados,
+        'series_produtos': dados_grafico['series_produtos'],
     }
     return render(request, 'ofertas/impacto_promocao.html', contexto)
 
@@ -454,13 +490,17 @@ def marketing(request):
     meses = meses_disponiveis(Lancamento.MARKETING)
     mes = mes_da_request(request, Lancamento.MARKETING)
 
-    queryset = filtrar_por_bandeira(
+    queryset_sem_mes = filtrar_por_bandeira(
         Lancamento.objects.filter(mecanica=Lancamento.MARKETING), bandeira
     )
+    queryset = queryset_sem_mes
     if mes:
         queryset = queryset.filter(ano_mes=mes)
     dados = calcular_marketing(queryset, busca=busca)
-    grafico = grafico_mensal(dados['por_mes'], [
+    # Gráfico com o histórico completo, não só o mês filtrado (decidido
+    # com o Gabriel 23/09/26 — ver comentário igual na view do Leve3).
+    dados_grafico = calcular_marketing(queryset_sem_mes, busca=busca)
+    grafico = grafico_mensal(dados_grafico['por_mes'], [
         ('venda', 'Venda'), ('lucro', 'Lucro'), ('itens', 'Itens', 'unidades'),
     ])
     anexar_cmv(dados['ranking_bandeiras'], 'venda', 'lucro')
@@ -476,6 +516,7 @@ def marketing(request):
         'mes_atual': mes,
         'grafico': grafico,
         **dados,
+        'series_produtos': dados_grafico['series_produtos'],
     }
     return render(request, 'ofertas/marketing.html', contexto)
 
@@ -493,10 +534,14 @@ def kimberly(request):
     if mes:
         queryset = queryset.filter(ano_mes=mes)
     dados = calcular_kimberly(queryset, busca=busca)
-    grafico = grafico_mensal(dados['por_mes'], [
+    # Gráfico e drill-down usam o histórico COMPLETO, não o recorte de mês
+    # da tabela/cards (decidido com o Gabriel 23/09/26 — ver comentário
+    # igual na view do Leve3).
+    dados_grafico = calcular_kimberly(queryset_sem_mes, busca=busca)
+    grafico = grafico_mensal(dados_grafico['por_mes'], [
         ('venda', 'Venda'), ('lucro', 'Lucro'), ('itens', 'Itens', 'unidades'),
     ])
-    dados_periodo = _dados_periodo(queryset_sem_mes, mes)
+    dados_periodo = _dados_periodo(queryset_sem_mes)
     anexar_cmv(dados['ranking_bandeiras'], 'venda', 'lucro')
     anexar_cmv(dados['produtos'], 'venda', 'lucro')
 
@@ -510,6 +555,7 @@ def kimberly(request):
         'grafico': grafico,
         **dados_periodo,
         **dados,
+        'series_produtos': dados_grafico['series_produtos'],
     }
     return render(request, 'ofertas/kimberly.html', contexto)
 
