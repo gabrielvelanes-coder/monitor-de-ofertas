@@ -156,6 +156,20 @@
   // destacado — volta a mostrar quando desmarcar todos. Telas com
   // gráfico mais simples (Leve3: só Venda × Itens) não passam esse
   // parâmetro, mantém o comportamento de sempre.
+  // Fator de "folga" da escala oculta do destaque (`yDestaque`) --
+  // sem isso, uma escala com `beginAtZero:true` e sem `max` explícito
+  // sempre estica o MAIOR valor do próprio item até o TOPO do canvas
+  // (é assim que auto-scale funciona: 0 embaixo, pico do item em cima) --
+  // por definição a linha sempre ia acabar cruzando por cima das barras,
+  // não importa o quão pequeno o item fosse (achado real 23/09/26,
+  // Gabriel: "a linha referente ao item, esta ficando em cima das
+  // barras" -- reproduzido no Leve3 Mês, gráfico empilhado por bandeira).
+  // Multiplicando o máximo por essa folga, o pico da linha passa a
+  // ocupar só uma fração da altura (1/FOLGA_DESTAQUE), sobrando espaço
+  // por cima -- ela passa a desenhar "dentro" da área do gráfico em vez
+  // de sempre tocar o teto.
+  var FOLGA_DESTAQUE = 2.5;
+
   window.iniciarDrillDown = function (chart, seriesPorItem, rotuloMetrica, ocultarBaseEnquantoAtivo) {
     var ativos = {};
     var qtdSeriesBase = chart.data.datasets.length;
@@ -173,51 +187,106 @@
       }
     }
 
-    return function (nome) {
+    // Recalcula o `max` do `yDestaque` toda vez que uma linha entra/sai --
+    // precisa acomodar a MAIOR entre todas as linhas de destaque ativas
+    // no momento (produto e campanha dividem a mesma escala/`chart`).
+    function atualizarEscalaDestaque() {
+      var maior = 0;
+      chart.data.datasets.forEach(function (ds) {
+        if (ds.yAxisID !== 'yDestaque') return;
+        (ds.data || []).forEach(function (v) {
+          if (typeof v === 'number' && v > maior) maior = v;
+        });
+      });
+      if (maior > 0) chart.options.scales.yDestaque.max = maior * FOLGA_DESTAQUE;
+    }
+
+    function removerAtivo(nome) {
+      var i = chart.data.datasets.indexOf(ativos[nome].dataset);
+      if (i !== -1) chart.data.datasets.splice(i, 1);
+      chart._seriesInfo.splice(i, 1);
+      delete ativos[nome];
+    }
+
+    function adicionarAtivo(nome) {
+      if (!seriesPorItem[nome]) return;
       var rotulo = maiuscula(rotuloMetrica ? nome + ' — ' + rotuloMetrica : nome);
-      if (ativos[nome]) {
-        var i = chart.data.datasets.indexOf(ativos[nome].dataset);
-        if (i !== -1) chart.data.datasets.splice(i, 1);
-        chart._seriesInfo.splice(i, 1);
-        delete ativos[nome];
-        chart.options.plugins.legend.display = chart.data.datasets.length > 1;
-        atualizarVisibilidadeBase();
-        // 'none' -- sem isso a animação as vezes trava no frame inicial
-        // (linha nasce em y=0, a animação pra subir até o valor real
-        // nunca termina de rodar) e a linha de destaque fica achatada
-        // no fundo do gráfico pra sempre (achado real 22/09/26, Gabriel:
-        // "quando eu seleciono um item, a linha fica a cima das barras" --
-        // na real ela ficava ACHATADA embaixo, escondida atrás/em cima
-        // das barras baixas, não subia pro valor certo). Sem animação
-        // nesse update, a posição final aplica na hora, sem depender de
-        // requestAnimationFrame terminar.
-        chart.update('none');
-        return false;
+      if (!chart.options.scales.yDestaque) {
+        chart.options.scales.yDestaque = { display: false, beginAtZero: true };
       }
-      if (seriesPorItem[nome]) {
-        if (!chart.options.scales.yDestaque) {
-          chart.options.scales.yDestaque = { display: false, beginAtZero: true };
+      var cor = DESTAQUES[Object.keys(ativos).length % DESTAQUES.length];
+      var dataset = {
+        // `type: 'line'` explícito -- o gráfico de fundo virou barra
+        // (22/09/26), sem isso o destaque nasceria como barra também
+        // (Chart.js segue o tipo do gráfico quando o dataset não diz o
+        // seu próprio), ficando confuso em cima de outras barras.
+        type: 'line',
+        label: rotulo, data: seriesPorItem[nome],
+        borderColor: cor, backgroundColor: cor, yAxisID: 'yDestaque',
+        borderWidth: 3, tension: 0.25, pointRadius: 4,
+      };
+      chart.data.datasets.push(dataset);
+      chart._seriesInfo.push({ label: rotulo, eixo: 'moeda' });
+      ativos[nome] = { dataset: dataset };
+    }
+
+    // `evento` (opcional): clique normal SUBSTITUI a seleção inteira por
+    // só este item (clicar de novo no único item ativo desmarca, limpa a
+    // seleção); Ctrl/Cmd+clique ACRESCENTA -- alterna só este item,
+    // mantém os outros já marcados (pedido 23/09/26: "quero ter a opcao
+    // de marcar mais de 1, usando o ctrl" -- antes todo clique era
+    // aditivo, sem jeito de "trocar" a seleção sem desmarcar 1 a 1).
+    // Devolve a lista de nomes ativos AGORA, pra quem chamou sincronizar
+    // o destaque visual de TODAS as linhas da tabela (não só a clicada --
+    // um clique simples pode ter desmarcado outras).
+    return function (nome, evento) {
+      var multiSelecao = !!(evento && (evento.ctrlKey || evento.metaKey));
+      if (multiSelecao) {
+        if (ativos[nome]) removerAtivo(nome);
+        else adicionarAtivo(nome);
+      } else {
+        var chaves = Object.keys(ativos);
+        var estavaAtivo = !!ativos[nome];
+        var eraSoEsse = estavaAtivo && chaves.length === 1;
+        chaves.forEach(function (outro) {
+          if (outro !== nome) removerAtivo(outro);
+        });
+        if (eraSoEsse) {
+          removerAtivo(nome);
+        } else if (!estavaAtivo) {
+          adicionarAtivo(nome);
         }
-        var cor = DESTAQUES[Object.keys(ativos).length % DESTAQUES.length];
-        var dataset = {
-          // `type: 'line'` explícito -- o gráfico de fundo virou barra
-          // (22/09/26), sem isso o destaque nasceria como barra também
-          // (Chart.js segue o tipo do gráfico quando o dataset não diz o
-          // seu próprio), ficando confuso em cima de outras barras.
-          type: 'line',
-          label: rotulo, data: seriesPorItem[nome],
-          borderColor: cor, backgroundColor: cor, yAxisID: 'yDestaque',
-          borderWidth: 3, tension: 0.25, pointRadius: 4,
-        };
-        chart.data.datasets.push(dataset);
-        chart._seriesInfo.push({ label: rotulo, eixo: 'moeda' });
-        ativos[nome] = { dataset: dataset };
+        // se já estava ativo e havia outros: já fica só ele, nada a mais.
       }
-      chart.options.plugins.legend.display = true;
+      chart.options.plugins.legend.display = chart.data.datasets.length > 1;
+      atualizarEscalaDestaque();
       atualizarVisibilidadeBase();
-      chart.update('none'); // ver comentário acima -- sem isso a linha nova às vezes fica travada em y=0
-      return true;
+      // 'none' -- sem isso a animação as vezes trava no frame inicial
+      // (linha nasce em y=0, a animação pra subir até o valor real nunca
+      // termina de rodar) e a linha de destaque fica achatada no fundo do
+      // gráfico pra sempre. Sem animação nesse update, a posição final
+      // aplica na hora, sem depender de requestAnimationFrame terminar.
+      chart.update('none');
+      return Object.keys(ativos);
     };
+  };
+
+  // Liga o clique de cada linha `.linha-clicavel` de uma tabela à função
+  // devolvida por `iniciarDrillDown` -- centraliza o padrão repetido em
+  // toda tela com drill-down (produto, campanha...), e sincroniza a
+  // classe `.selecionada` de TODAS as linhas a cada clique (não só a
+  // clicada -- um clique simples, sem Ctrl, pode ter desmarcado outras).
+  // `atributo` = nome do `data-*` que identifica a linha (ex. 'produto'
+  // pra `data-produto`).
+  window.ligarSelecaoTabela = function (linhas, destacarFn, atributo) {
+    linhas.forEach(function (tr) {
+      tr.addEventListener('click', function (evento) {
+        var ativos = destacarFn(tr.dataset[atributo], evento);
+        linhas.forEach(function (linha) {
+          linha.classList.toggle('selecionada', ativos.indexOf(linha.dataset[atributo]) !== -1);
+        });
+      });
+    });
   };
 
   // Clicar num mês do gráfico de evolução mensal aplica o mesmo filtro

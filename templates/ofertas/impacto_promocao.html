@@ -95,11 +95,7 @@
   ativarCliqueMes(chart, dados.labels);
   var seriesProdutos = JSON.parse(document.getElementById('dados-series-produtos-promocao').textContent);
   var destacarProduto = iniciarDrillDown(chart, seriesProdutos, 'Venda oferta');
-  document.querySelectorAll('#tabela-produtos .linha-clicavel').forEach(function (tr) {
-    tr.addEventListener('click', function () {
-      tr.classList.toggle('selecionada', destacarProduto(tr.dataset.produto));
-    });
-  });
+  ligarSelecaoTabela(document.querySelectorAll('#tabela-produtos .linha-clicavel'), destacarProduto, 'produto');
 
   var dadosPeriodoEl = document.getElementById('dados-periodo-promocao');
   if (dadosPeriodoEl) {

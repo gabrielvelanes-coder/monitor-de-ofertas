@@ -111,10 +111,6 @@
   ativarCliqueMes(chart, dados.labels);
   var seriesProdutos = JSON.parse(document.getElementById('dados-series-produtos-cestoes').textContent);
   var destacarProduto = iniciarDrillDown(chart, seriesProdutos, 'Venda');
-  document.querySelectorAll('#tabela-produtos .linha-clicavel').forEach(function (tr) {
-    tr.addEventListener('click', function () {
-      tr.classList.toggle('selecionada', destacarProduto(tr.dataset.produto));
-    });
-  });
+  ligarSelecaoTabela(document.querySelectorAll('#tabela-produtos .linha-clicavel'), destacarProduto, 'produto');
 </script>
 {% endblock %}
