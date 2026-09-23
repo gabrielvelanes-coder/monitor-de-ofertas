@@ -9,3 +9,4 @@ dados/saida/*
 !dados/saida/.gitkeep
 *.log
 .DS_Store
+.env

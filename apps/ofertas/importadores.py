@@ -25,6 +25,7 @@ from .models import Lancamento
 
 def importar_relatorio_fabricante(
     caminho, mecanica: str, tag_alvo: str | list[str], fabricante: str, escopo_delete: str = 'mecanica',
+    df=None, origem: str | None = None, desde=None,
 ) -> dict:
     """`escopo_delete='mecanica'` (padrão, Kenvue/Principia/Botica): cada
     import é um baseline completo, apaga a mecânica inteira antes de
@@ -38,10 +39,19 @@ def importar_relatorio_fabricante(
     strings -- Botica tem 3 tags que contam como oferta pro Gabriel
     ("OFERTA BOTICA NACIONAL"/"OFERTAS BOTICA"/"OFERTAS BOTICA KIT AG",
     confirmado 22/09/26: a "Nacional" só tinha mecânica de PAGAMENTO/verba
-    diferente por trás, mas as 3 são oferta de verdade pro painel)."""
+    diferente por trás, mas as 3 são oferta de verdade pro painel).
+
+    Leitura direta do banco (23/09/26, `importar_do_banco`): em vez do .xls,
+    recebe `df` já no formato de `ler_relatorio_erp` (ver
+    `erp_banco.consultar_venda_por_item`), `origem` = rótulo gravado em
+    `arquivo_origem` (ex. 'banco') e, opcional, `desde` = data inicial de
+    uma atualização incremental: só apaga/recria lançamentos da mecânica
+    com `data >= desde`, preservando o histórico anterior."""
     tags_alvo = {tag_alvo.upper()} if isinstance(tag_alvo, str) else {t.upper() for t in tag_alvo}
 
-    df, _, _ = ler_relatorio_erp(caminho)
+    if df is None:
+        df, _, _ = ler_relatorio_erp(caminho)
+    nome_origem = origem or caminho.name
 
     col_loja = coluna(df, 'Cód. Un. Neg.')
     col_ano_mes = coluna(df, 'Ano-mês')
@@ -112,12 +122,14 @@ def importar_relatorio_fabricante(
             desconto=linha.get(col_desconto) or 0,
             custo=linha[col_custo],
             lucro=linha[col_lucro],
-            arquivo_origem=caminho.name,
+            arquivo_origem=nome_origem,
         ))
 
     filtro_delete = {'mecanica': mecanica}
     if escopo_delete == 'arquivo':
-        filtro_delete['arquivo_origem'] = caminho.name
+        filtro_delete['arquivo_origem'] = nome_origem
+    if desde is not None:
+        filtro_delete['data__gte'] = desde
     with transaction.atomic():
         apagados, _ = Lancamento.objects.filter(**filtro_delete).delete()
         Lancamento.objects.bulk_create(lancamentos, batch_size=1000)

@@ -29,6 +29,13 @@ do fabricante; base = todo o resto das vendas dele, "Sem Desconto"
 incluído. Os 4 fabricantes foram reimportados; base agora é sempre maior
 que oferta, em todo mês.
 
+**Leitura direta do banco do ERP (23/09/26, em andamento):** Kenvue e
+Principia já são importadas direto do PostgreSQL do ERP (somente leitura), sem .xls —
+`python manage.py importar_do_banco <mecanica> [--comparar | --dias N]`.
+Ambas validadas (0,00%); Botica com pendência (+0,22%). Mapeamento,
+filtros, status e próximos passos em
+[`docs/INTEGRACAO_BANCO_ERP.md`](docs/INTEGRACAO_BANCO_ERP.md).
+
 ## Rodando localmente
 
 ```
