@@ -8,14 +8,21 @@ Uso:
     python manage.py importar_do_banco kenvue --dias 7      # atualização incremental (últimos 7 dias)
     python manage.py importar_do_banco todas --dias 7       # todas as mecânicas já liberadas
 
-Piloto (23/09/26): Kenvue, Principia, Botica, Procter e Marketing.
+Piloto (23/09/26): Kenvue, Principia, Botica, Procter, Marketing,
+Cestões e Leve 3.
 
-2 "tipos" de mecânica: `'fabricante'` (a maioria -- 1 ou mais fabricantes
-do ERP, `consultar_venda_por_item`) e `'tag'` (Marketing -- não é de 1
-fabricante só, filtra por padrão de nome do caderno de oferta em vez de
-fabricante, `consultar_venda_por_tag`; usa `fabricante=None` em
-`importar_relatorio_fabricante` pra pegar o fabricante por linha do
-próprio banco, já que a mecânica espalha por vários)."""
+Tipos de mecânica: `'fabricante'` (a maioria -- 1 ou mais fabricantes do
+ERP, `consultar_venda_por_item`); `'tag'` (Marketing -- não é de 1
+fabricante só, filtra por padrão de nome do caderno de oferta,
+`consultar_venda_por_tag`, `fabricante=None` pega o fabricante por linha
+do próprio banco); `'produtos_com_tag'` (Cestões -- acha produtos que já
+tiveram a tag, depois traz o histórico completo deles,
+`consultar_venda_por_produtos`); `'leve3'` (parecido com `'tag'`, mas o
+fabricante do banco não serve -- genéricos de laboratórios diferentes
+com o MESMO nome de produto entre eles, o painel precisa do cadastro
+`apps.produtos` pra bater com o rótulo curto que `calcular_impacto_
+leve3_fabricante`/Sellout usam, ex. "EMS"/"Eurofarma", não "EMS GENERICO
+S/A" como o ERP chama)."""
 from __future__ import annotations
 
 from collections import defaultdict
@@ -25,13 +32,15 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db.models import Max, Sum
 
 from apps.lojas.models import Loja
-from apps.ofertas.erp import codigo_loja, tag_sem_prefixo
+from apps.ofertas.erp import codigo_loja, fabricante_generico, tag_sem_prefixo
 from apps.ofertas.erp_banco import (
     consultar_venda_por_item, consultar_venda_por_produtos, consultar_venda_por_tag,
 )
 from apps.ofertas.importadores import importar_relatorio_fabricante
 from apps.ofertas.management.commands.importar_botica import TAGS_BOTICA
 from apps.ofertas.models import Lancamento
+from apps.produtos.services import mapa_fabricantes
+from apps.verba.services import sincronizar_verba_leve3
 
 # 2 tags = 2 campanhas coexistindo na mesma tela (promoção mensal + Semana
 # do Cliente) -- `importar_relatorio_fabricante` já separa por campanha
@@ -93,6 +102,20 @@ MECANICAS = {
         'tipo': 'produtos_com_tag', 'mecanica': Lancamento.CESTOES, 'fabricante': None,
         'filtro': 'OFERTAS CESTAO',
     },
+    # 4º tipo: como 'tag' (não é 1 fabricante, filtra pela tag da promoção),
+    # mas o fabricante do BANCO (razão social/pessoa jurídica) não serve --
+    # ex. "EMS GENERICO S/A" -- o resto do painel (Sellout, `calcular_
+    # impacto_leve3_fabricante`) espera o rótulo curto do cadastro
+    # `apps.produtos` ("EMS"). `_processar` troca a coluna 'fabricante' do
+    # df pelo cadastro (com a heurística velha de fallback) ANTES de
+    # importar. Confirmado (23/09/26): só 2 variações de tag no banco
+    # ("OFERTA GENERICOS LEVE 3 PAGUE 2" e "... -", claramente a mesma
+    # promoção) -- diferente do Cestões, sem risco de pegar caderno de
+    # outro projeto.
+    'leve3': {
+        'tipo': 'leve3', 'mecanica': Lancamento.LEVE3, 'fabricante': None,
+        'filtro': '%LEVE 3%',
+    },
 }
 INICIO_PADRAO = date(2026, 1, 1)
 ORIGEM = 'banco'
@@ -146,13 +169,22 @@ class Command(BaseCommand):
         if cfg['tipo'] == 'fabricante':
             df = consultar_venda_por_item(inicio, fim, filtro)
             tags_alvo = {cfg['tags'].upper()} if isinstance(cfg['tags'], str) else {t.upper() for t in cfg['tags']}
-        elif cfg['tipo'] == 'tag':
+        elif cfg['tipo'] in ('tag', 'leve3'):
             df = consultar_venda_por_tag(inicio, fim, filtro)
             # Todo mundo que a consulta trouxe já bate o padrão da tag --
             # deriva a lista de tags EXATAS achadas (pode variar por mês,
             # ex. "PRODUTOS MARKETING AGOSTO"/"...SETEMBRO") em vez de fixar
             # uma lista, senão um mês novo nunca visto ficaria de fora.
             tags_alvo = {tag_sem_prefixo(t).upper() for t in df['detalhe_desconto'].dropna().unique()}
+            if cfg['tipo'] == 'leve3':
+                # O fabricante do BANCO é a razão social (ex. "EMS GENERICO
+                # S/A") -- troca pelo rótulo curto do cadastro `apps.produtos`
+                # (ex. "EMS"), que é o que Sellout/impacto por fabricante
+                # esperam. Heurística velha só como fallback de segurança.
+                mapa_fab = mapa_fabricantes()
+                df['fabricante'] = df['embalagem'].map(
+                    lambda p: mapa_fab.get(p) or fabricante_generico(p)
+                )
         else:  # 'produtos_com_tag' (Cestões)
             # A descoberta de QUAIS produtos usa sempre o histórico completo
             # (INICIO_PADRAO-hoje), nunca só a janela [inicio, fim] -- senão
@@ -184,6 +216,12 @@ class Command(BaseCommand):
         if resultado['lojas_sem_cadastro']:
             self.stdout.write(self.style.WARNING(
                 f"Lojas sem cadastro (ignoradas): {', '.join(sorted(resultado['lojas_sem_cadastro']))}."
+            ))
+
+        if cfg['tipo'] == 'leve3':
+            verbas = sincronizar_verba_leve3()
+            self.stdout.write(self.style.SUCCESS(
+                f'Verba: valor_apurado atualizado em {len(verbas)} mês(es) (VerbaMensal, mecânica leve3).'
             ))
 
     def _comparar(self, nome, mecanica, df, tags_alvo, inicio, fim):
