@@ -105,11 +105,16 @@ Backup do painel antes da 1ª gravação: `db.sqlite3.bak-antes-banco`
    `PROMOÇÃO PROCTER` + `OFERTAS PROCTER SEMANA DO CLIENTE`), hoje
    importadas de arquivos separados com `escopo_delete='arquivo'`.
    Precisa tratamento próprio (1 consulta, 2 tags).
-4. **Botão "Atualizar agora"** no painel (roda o incremental das
-   mecânicas liberadas).
+4. ~~Botão "Atualizar agora"~~ — resolvido (23/09/26): botão no menu
+   "Sistema" do painel, `views.atualizar_agora` roda `importar_do_banco
+   todas --dias 7` na hora e mostra mensagem de sucesso/erro.
 5. **Atualização automática 1x por dia** (decidido com o Gabriel: todo
-   dia de manhã, ex. 6h) via Agendador de Tarefas do Windows:
-   `.venv\Scripts\python manage.py importar_do_banco todas --dias 7`.
+   dia de manhã, 6h) via Agendador de Tarefas do Windows —
+   `atualizar_diario.bat` (raiz do projeto) já criado e testado, roda
+   `importar_do_banco todas --dias 7` e loga em `atualizacao_diaria.log`.
+   **Falta só registrar a tarefa** (`Register-ScheduledTask` foi bloqueado
+   pelo modo automático do Claude Code por mudar o sistema — ver instrução
+   deixada pro Gabriel rodar com `!` ou pelo Agendador de Tarefas na UI).
    O computador precisa estar ligado no horário.
 6. Demais mecânicas (Leve 3, Kimberly, Cestões, Marketing, etc.), uma a
    uma, sempre com `--comparar` antes de gravar. Cadernos de oferta,
