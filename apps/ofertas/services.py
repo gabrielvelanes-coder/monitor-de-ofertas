@@ -201,16 +201,11 @@ def calcular_leve3(queryset, busca: str = ''):
     ]
     produtos.sort(key=lambda p: p['venda'], reverse=True)
 
-    # `bandeira_dominante` por mês -- gráfico "Mês" do Leve3 pintado por
-    # bandeira também (pedido 22/09/26: "no mes, nao foi implantado as
-    # cores das bandeiras?" -- só tinha ido pro Semana/Dia).
+    # Venda e itens por bandeira, por mês -- gráfico "Mês" do Leve3
+    # também dividido por bandeira (venda desde 22/09/26, itens desde
+    # 23/09/26 -- "separar as unidades tambem, por bandeira").
     for mes in por_mes.values():
         mes.update(_campos_bandeira(mes.pop('_venda_bandeira')))
-        # Unidades também separadas por bandeira no gráfico Mês (pedido
-        # 23/09/26, logo depois da barra empilhada de venda: "separar as
-        # unidades tambem, por bandeira") -- reaproveita o mesmo helper com
-        # outro prefixo, só `bandeira_dominante` (calculado a partir da
-        # venda, acima) não precisa ser recalculado de novo aqui.
         itens_bandeira = mes.pop('_itens_bandeira')
         mes['itens_velanes'] = float(itens_bandeira.get('velanes', ZERO))
         mes['itens_ultra_popular'] = float(itens_bandeira.get('ultra_popular', ZERO))
@@ -445,17 +440,17 @@ def _meses_antes(ano_mes: str, quantos: int) -> list[str]:
 
 def _campos_bandeira(venda_bandeira: dict) -> dict:
     """`venda_bandeira` = `{bandeira: venda_do_período_nela}` -- devolve
-    `bandeira_dominante` (a que mais vendeu, usada no gráfico do Leve3 --
-    roda 1 semana por mês, POR bandeira, em semanas diferentes, pedido
-    22/09/26: "semana de ultra barra vermelha, semana de velanes,
-    laranja") + `venda_velanes`/`venda_ultra_popular` (usadas na barra
-    empilhada das outras mecânicas -- essas rodam nas 2 bandeiras ao
-    mesmo tempo, "de quem foi" não faz sentido, mas "quanto foi de cada"
-    sim; pedido 22/09/26, mesmo dia: "faze isso tambem, para os outros,
-    talvez dividido nas barras"). Sempre calculado, mesmo quando a tela
-    não usa (fica no payload sem custo nenhum)."""
+    `venda_velanes`/`venda_ultra_popular`, usadas na barra empilhada por
+    bandeira (pedido 22/09/26: "faze isso tambem, para os outros, talvez
+    dividido nas barras"). Sempre calculado, mesmo quando a tela não usa
+    (fica no payload sem custo nenhum).
+
+    Já teve também `bandeira_dominante` (a que mais vendeu, pra pintar a
+    barra inteira de 1 cor só) -- removido em 23/09/26: escondia venda
+    real da bandeira "perdedora" (achado: semana de 25/05/26 do Leve3
+    tinha R$21mil Velanes + R$9,5mil Ultra, saía 100% laranja) -- o
+    Leve3 também passou a usar a barra empilhada, não sobrou nenhum uso."""
     return {
-        'bandeira_dominante': max(venda_bandeira, key=venda_bandeira.get) if venda_bandeira else None,
         'venda_velanes': float(venda_bandeira.get('velanes', ZERO)),
         'venda_ultra_popular': float(venda_bandeira.get('ultra_popular', ZERO)),
     }

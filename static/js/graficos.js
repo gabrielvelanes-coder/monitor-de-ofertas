@@ -380,24 +380,25 @@
   // no `graficoBarra` de sempre, com drill-down por produto e clique
   // pra filtrar mês, que esse formato mais simples não tem).
   var COR_NORMAL = '#5b8def', COR_DESTAQUE = '#e8628f';
-  // Leve3 roda 1 semana por mês, POR bandeira, em semanas diferentes
-  // entre Velanes/Ultra Popular -- "destaque por oferta" não diz nada
-  // (toda semana com dado já é oferta, ver `_periodos_com_destaque`),
-  // então lá a cor mostra de QUEM foi a semana em vez de SE teve oferta
-  // (pedido 22/09/26: "semana de ultra barra vermelha, semana de
-  // velanes, laranja"). `graficoBarraDestaque(..., {modo:'bandeira'})`.
+  // Cores fixas de bandeira (laranja Velanes / vermelho Ultra Popular) --
+  // usadas no Mês do Leve3 (`graficoBarraMensalBandeira`) e, desde
+  // 23/09/26, também na barra empilhada de Semana/Dia do Leve3
+  // (`graficoBarraEmpilhadaBandeira(..., {cores: CORES_BANDEIRA})`) --
+  // achado real: a versão anterior (cor única = bandeira "dominante" da
+  // semana) escondia venda de verdade da outra bandeira numa semana que
+  // teve as duas (25/05/26: R$21mil Velanes + R$9,5mil Ultra, semana
+  // saía 100% laranja). Exposta global pro template não duplicar os hex.
   var CORES_BANDEIRA = { velanes: '#ef9f5b', ultra_popular: '#e5484d' };
+  window.CORES_BANDEIRA = CORES_BANDEIRA;
 
-  window.graficoBarraDestaque = function (canvasId, periodos, opcoes) {
+  window.graficoBarraDestaque = function (canvasId, periodos) {
     var elemento = document.getElementById(canvasId);
     if (!elemento || !periodos.length) return null;
-    var porBandeira = opcoes && opcoes.modo === 'bandeira';
 
     var labels = periodos.map(function (p) { return p.rotulo + (p.parcial ? '*' : ''); });
     var dados = periodos.map(function (p) { return p.venda; });
     var cores = periodos.map(function (p) {
       if (p.parcial) return 'rgba(91,141,239,.35)'; // período incompleto, ainda sem todos os dias de dado
-      if (porBandeira) return CORES_BANDEIRA[p.bandeira_dominante] || COR_NORMAL;
       return p.tem_oferta ? COR_DESTAQUE : COR_NORMAL;
     });
 
@@ -411,7 +412,7 @@
         ctx.textAlign = 'center';
         ctx.fillStyle = COR_DESTAQUE;
         periodos.forEach(function (p, i) {
-          if (porBandeira || p.crescimento_pct === null || p.crescimento_pct === undefined) return;
+          if (p.crescimento_pct === null || p.crescimento_pct === undefined) return;
           var seta = p.crescimento_pct >= 0 ? '▲ +' : '▼ ';
           var texto = seta + Math.abs(p.crescimento_pct).toFixed(0) + '%';
           var elem = meta.data[i];
@@ -461,15 +462,24 @@
     ultra_popular: { normal: '#3f6bc4', destaque: '#c94c72' },
   };
 
-  window.graficoBarraEmpilhadaBandeira = function (canvasId, periodos) {
+  window.graficoBarraEmpilhadaBandeira = function (canvasId, periodos, opcoes) {
     var elemento = document.getElementById(canvasId);
     if (!elemento || !periodos.length) return null;
 
     var labels = periodos.map(function (p) { return p.rotulo + (p.parcial ? '*' : ''); });
+    // Paleta padrão: tons rosa/azul por oferta (fabricantes, ver comentário
+    // acima). Leve3 (pedido 23/09/26: achamos uma semana com venda real
+    // das 2 bandeiras escondida atrás da cor "dominante" única) passa sua
+    // PRÓPRIA paleta fixa (`opcoes.cores`, laranja/vermelho de sempre) --
+    // lá não faz sentido colorir por oferta (toda semana já é oferta,
+    // `tem_oferta` sempre true, ver `_periodos_com_destaque`), o que
+    // importa é sempre identificar a bandeira, não se teve oferta.
+    var paleta = (opcoes && opcoes.cores) || CORES_OFERTA_BANDEIRA;
 
     function corSegmento(p, bandeira) {
       if (p.parcial) return 'rgba(91,141,239,.35)';
-      var cores = CORES_OFERTA_BANDEIRA[bandeira];
+      var cores = paleta[bandeira];
+      if (typeof cores === 'string') return cores;
       return p.tem_oferta ? cores.destaque : cores.normal;
     }
 
@@ -554,9 +564,9 @@
         criados[valor] = true;
         var canvasId = 'grafico-' + valor + '-' + idBase;
         if (opcoes && opcoes.modo === 'bandeira-empilhada') {
-          graficoBarraEmpilhadaBandeira(canvasId, dadosPeriodo[valor]);
+          graficoBarraEmpilhadaBandeira(canvasId, dadosPeriodo[valor], opcoes);
         } else {
-          graficoBarraDestaque(canvasId, dadosPeriodo[valor], opcoes);
+          graficoBarraDestaque(canvasId, dadosPeriodo[valor]);
         }
       });
     });

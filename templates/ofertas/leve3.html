@@ -56,7 +56,7 @@
     {% endif %}
     <canvas id="grafico-leve3"></canvas>
   </div>
-  {% include "ofertas/_paineis_periodo.html" with id_periodo="leve3" id_dados_periodo="dados-periodo-leve3" legenda_semana="Cor mostra de quem foi a semana — laranja Velanes, vermelho Ultra Popular." legenda_dia="Cor mostra de quem foi o dia — laranja Velanes, vermelho Ultra Popular." %}
+  {% include "ofertas/_paineis_periodo.html" with id_periodo="leve3" id_dados_periodo="dados-periodo-leve3" legenda_semana="Barra dividida entre Velanes e Ultra Popular — laranja Velanes, vermelho Ultra Popular." legenda_dia="Barra dividida entre Velanes e Ultra Popular — laranja Velanes, vermelho Ultra Popular." %}
 </div>
 {{ grafico|json_script:"dados-grafico-leve3" }}
 {{ series_produtos|json_script:"dados-series-produtos-leve3" }}
@@ -227,7 +227,7 @@
 
   var dadosPeriodoEl = document.getElementById('dados-periodo-leve3');
   if (dadosPeriodoEl) {
-    montarAbasGraficoPeriodo('leve3', JSON.parse(dadosPeriodoEl.textContent), { modo: 'bandeira' });
+    montarAbasGraficoPeriodo('leve3', JSON.parse(dadosPeriodoEl.textContent), { modo: 'bandeira-empilhada', cores: window.CORES_BANDEIRA });
   }
 </script>
 {% endblock %}
