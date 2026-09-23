@@ -7,7 +7,10 @@ from apps.lojas.models import Loja
 from apps.produtos.models import RebaixaProduto
 from apps.verba.services import anexar_cmv, cmv_pct, cmv_pct_com_verba, verba_apurada
 
-from .apuracao import gerar_dataframe_apuracao, nome_arquivo_apuracao
+from .apuracao import (
+    escrever_excel_apuracao, gerar_dataframe_apuracao, nome_arquivo_apuracao,
+    resumo_apuracao_industria, resumo_apuracao_leve3,
+)
 from .erp import tag_sem_prefixo
 from .models import Lancamento
 from .services import (
@@ -15,7 +18,8 @@ from .services import (
     calcular_impacto_fabricante, calcular_impacto_leve3_fabricante,
     calcular_kimberly, calcular_leve3, calcular_marketing,
     calcular_supracorp, filtrar_por_bandeira, grafico_mensal,
-    mes_da_request, meses_disponiveis, querystring_extra, serie_semanal,
+    mes_da_request, meses_disponiveis, querystring_extra, serie_diaria,
+    serie_semanal,
 )
 
 ZERO = Decimal('0')
@@ -34,6 +38,23 @@ PROMOCOES = {
     'deu_a_louca': (Lancamento.DEU_A_LOUCA, 'Deu a Louca'),
     'ultra_queimao': (Lancamento.ULTRA_QUEIMAO, 'Ultra Queimão'),
 }
+
+
+def _dados_periodo(queryset_sem_mes, mes):
+    """Abas Semana/Dia do gráfico único (pedido 22/09/26 -- "apenas 1
+    gráfico... escolher olhar por mês, semana ou dia") -- a aba Mês usa o
+    `grafico_mensal` de sempre (drill-down/clique-pra-filtrar), essas 2
+    granularidades novas usam o mesmo formato simples do antigo gráfico
+    semanal. `tem_semana`/`tem_dia` decidem se a aba aparece — mecânica
+    com cobertura parcial de `data` (Leve3, Deu a Louca/Ultra Queimão) pode
+    ficar sem nenhuma semana/dia pro recorte de mês/fabricante escolhido."""
+    semanas = serie_semanal(queryset_sem_mes, mes)['periodos']
+    dias = serie_diaria(queryset_sem_mes, mes)['periodos']
+    return {
+        'dados_periodo': {'semana': semanas, 'dia': dias},
+        'tem_semana': bool(semanas),
+        'tem_dia': bool(dias),
+    }
 
 
 def _resumo_executivo(bandeira, mes=''):
@@ -157,16 +178,31 @@ def leve3(request):
         queryset = queryset.filter(ano_mes=mes)
 
     dados = calcular_leve3(queryset, busca=busca)
-    grafico = grafico_mensal(dados['por_mes'], [
-        ('venda', 'Venda'), ('itens', 'Itens', 'unidades'),
-    ])
+    # Venda dividida em 2 séries (Velanes/Ultra Popular) em vez de 1 série
+    # só pintada pela bandeira "dominante" do mês -- a versão anterior
+    # (dominante) saía sempre laranja/Velanes em TODO mês (Velanes vende
+    # mais que a Ultra Popular o ano inteiro, mesmo cada uma rodando sua
+    # própria semana), ficando monótona/sem informação nenhuma (achado do
+    # Gabriel: "kenvue esta assim [rico, 4 séries] / leve3 eta assim
+    # [tudo laranja] ... vamos arrumar isso"). Empilhada, mostra a
+    # proporção real de cada bandeira por mês em vez de só "quem ganhou".
+    grafico = {
+        'labels': [m['ano_mes'] for m in dados['por_mes']],
+        'venda_velanes': [m['venda_velanes'] for m in dados['por_mes']],
+        'venda_ultra_popular': [m['venda_ultra_popular'] for m in dados['por_mes']],
+        'itens': [float(m['itens']) for m in dados['por_mes']],
+    }
     # Leve3 não tem `grupo` preenchido (só importa a venda que já é a
-    # própria oferta, sem contraparte "base" pra comparar) -- as barras
-    # saem todas sem destaque/%, mas ainda mostram a venda por semana (útil
+    # própria oferta, sem contraparte "base" pra comparar) -- todo período
+    # com venda já é, por definição, semana/dia de oferta (fallback em
+    # `_periodos_com_destaque`, services.py), então sai todo destacado,
+    # mas sem % (não tem baseline "sem oferta" nenhum pra comparar). Útil
     # pra ver em qual semana cada bandeira rodou o combo, já que Velanes e
-    # Ultra Popular giram em semanas diferentes).
-    semanas = serie_semanal(queryset_sem_mes, mes)['semanas']
+    # Ultra Popular giram em semanas diferentes.
+    dados_periodo = _dados_periodo(queryset_sem_mes, mes)
     impacto_fabricantes = calcular_impacto_leve3_fabricante()
+    apuracao_resumo = resumo_apuracao_leve3(ano_mes=mes)
+    apuracao_total = sum((r['investimento'] for r in apuracao_resumo), ZERO)
 
     # CMV com/sem verba usando o investimento já calculado pro recorte atual
     # (bandeira/fabricante/busca/mês) — não o agregado de VerbaMensal, que
@@ -189,8 +225,10 @@ def leve3(request):
         'meses_disponiveis': meses,
         'mes_atual': mes,
         'grafico': grafico,
-        'semanas': semanas,
         'impacto_fabricantes': impacto_fabricantes,
+        'apuracao_resumo': apuracao_resumo,
+        'apuracao_total': apuracao_total,
+        **dados_periodo,
         **dados,
     }
     return render(request, 'ofertas/leve3.html', contexto)
@@ -297,7 +335,9 @@ def impacto_fabricante(request, fabricante):
         ('venda_base', 'Venda base'), ('venda_oferta', 'Venda oferta'),
         ('itens_base', 'Itens base', 'unidades'), ('itens_oferta', 'Itens oferta', 'unidades'),
     ])
-    semanas = serie_semanal(queryset_sem_mes, mes)['semanas']
+    dados_periodo = _dados_periodo(queryset_sem_mes, mes)
+    apuracao_resumo = resumo_apuracao_industria(mecanica, campanhas_com_rebaixa, ano_mes=mes)
+    apuracao_total = sum((r['investimento'] for r in apuracao_resumo), ZERO)
 
     # CMV geral (base + oferta) com/sem verba — com_verba fica None pros 4
     # fabricantes hoje (sem fórmula de apuração ainda, ver PLANO_VERBA.md);
@@ -325,8 +365,10 @@ def impacto_fabricante(request, fabricante):
         'mes_atual': mes,
         'tem_multiplas_campanhas': tem_multiplas_campanhas,
         'campanhas_com_rebaixa': campanhas_com_rebaixa,
+        'apuracao_resumo': apuracao_resumo,
+        'apuracao_total': apuracao_total,
         'grafico': grafico,
-        'semanas': semanas,
+        **dados_periodo,
         **dados,
     }
     return render(request, 'ofertas/impacto_fabricante.html', contexto)
@@ -354,7 +396,7 @@ def impacto_promocao(request, promocao):
         ('venda_base', 'Venda base'), ('venda_oferta', 'Venda oferta'),
         ('itens_base', 'Itens base', 'unidades'), ('itens_oferta', 'Itens oferta', 'unidades'),
     ])
-    semanas = serie_semanal(queryset_sem_mes, mes)['semanas']
+    dados_periodo = _dados_periodo(queryset_sem_mes, mes)
 
     # Mesma decisão de CMV do impacto_fabricante: sem fórmula de verba
     # definida ainda pra estas 2 promoções, então com_verba fica None (o
@@ -378,7 +420,7 @@ def impacto_promocao(request, promocao):
         'meses_disponiveis': meses,
         'mes_atual': mes,
         'grafico': grafico,
-        'semanas': semanas,
+        **dados_periodo,
         **dados,
     }
     return render(request, 'ofertas/impacto_promocao.html', contexto)
@@ -432,7 +474,7 @@ def kimberly(request):
     grafico = grafico_mensal(dados['por_mes'], [
         ('venda', 'Venda'), ('lucro', 'Lucro'), ('itens', 'Itens', 'unidades'),
     ])
-    semanas = serie_semanal(queryset_sem_mes, mes)['semanas']
+    dados_periodo = _dados_periodo(queryset_sem_mes, mes)
     anexar_cmv(dados['ranking_bandeiras'], 'venda', 'lucro')
     anexar_cmv(dados['produtos'], 'venda', 'lucro')
 
@@ -444,7 +486,7 @@ def kimberly(request):
         'meses_disponiveis': meses,
         'mes_atual': mes,
         'grafico': grafico,
-        'semanas': semanas,
+        **dados_periodo,
         **dados,
     }
     return render(request, 'ofertas/kimberly.html', contexto)
@@ -471,10 +513,10 @@ def exportar_apuracao(request, mecanica):
     if df.empty:
         raise Http404('Nenhum lançamento encontrado pra gerar a apuração.')
 
-    nome_arquivo = nome_arquivo_apuracao(fabricante if mecanica == Lancamento.LEVE3 else campanha, mes)
+    nome_oferta = fabricante if mecanica == Lancamento.LEVE3 else campanha
     resposta = HttpResponse(
         content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     )
-    resposta['Content-Disposition'] = f'attachment; filename="{nome_arquivo}"'
-    df.to_excel(resposta, index=False, sheet_name='Apuração')
+    resposta['Content-Disposition'] = f'attachment; filename="{nome_arquivo_apuracao(nome_oferta, mes)}"'
+    escrever_excel_apuracao(df, dados, nome_oferta, resposta)
     return resposta

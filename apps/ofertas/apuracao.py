@@ -18,6 +18,7 @@ from __future__ import annotations
 from decimal import Decimal
 
 import pandas as pd
+from openpyxl.styles import Border, Font, Side
 
 from apps.produtos.models import Produto, RebaixaProduto
 
@@ -27,18 +28,24 @@ from .models import Lancamento
 ZERO = Decimal('0')
 
 _COLUNAS_FABRICANTE = {
-    'loja': 'Loja', 'bandeira': 'Bandeira', 'data': 'Data', 'ean': 'EAN',
+    'bandeira': 'Bandeira', 'data': 'Data', 'ean': 'EAN',
     'produto': 'Produto', 'itens': 'Itens', 'venda': 'Venda',
-    'desconto': 'Desconto', 'custo': 'Custo', 'lucro': 'Lucro',
     'valor_rebaixa_unitario': 'Valor da Rebaixa (R$/un.)',
     'investimento': 'Investimento (R$)',
 }
 _COLUNAS_LEVE3 = {
-    'loja': 'Loja', 'bandeira': 'Bandeira', 'data': 'Data', 'ano_mes': 'Ano-mês',
-    'produto': 'Produto', 'itens': 'Itens', 'venda': 'Venda', 'custo': 'Custo',
-    'lucro': 'Lucro', 'ciclos': 'Ciclos', 'custo_unitario': 'Custo Unitário (R$)',
+    'bandeira': 'Bandeira', 'data': 'Data', 'ano_mes': 'Ano-mês',
+    'produto': 'Produto', 'itens': 'Itens', 'venda': 'Venda',
+    'ciclos': 'Ciclos', 'custo_unitario': 'Custo Unitário (R$)',
     'investimento': 'Investimento (R$)',
 }
+
+# Colunas somadas na linha de TOTAL do rodapé -- Custo/Lucro/Desconto
+# nunca entram nesse arquivo (pedido do Gabriel 22/09, "não faz sentido
+# mostrar nossa margem pra indústria" -- não são a base de nenhuma das 2
+# fórmulas de investimento, só "Custo Unitário" do Leve3 é, e esse fica
+# de fora da soma por ser um valor unitário, não aditivo).
+COLUNAS_SOMAVEIS = {'Itens', 'Venda', 'Ciclos', 'Investimento (R$)'}
 
 
 def _slug(texto: str) -> str:
@@ -94,6 +101,101 @@ def gerar_dataframe_apuracao(
     return df, dados
 
 
+def periodo_texto(dados: dict) -> str:
+    """Texto de período pro cabeçalho do arquivo de apuração -- 'Período:
+    dd/mm/aaaa a dd/mm/aaaa', sempre a partir da DATA REAL das linhas
+    exportadas (a data em que a ação/promoção de fato vendeu), nunca o
+    mês-calendário inteiro do filtro (correção 22/09/26: "o cabeçalho tem
+    que ser a data da ação" -- 1ª versão usava dia 1 ao último dia do mês
+    quando `?mes=` vinha preenchido, mas a ação pode ter rodado só numa
+    semana daquele mês, ex. Leve3/Procter)."""
+    datas = [l['data'] for l in dados['linhas'] if l.get('data')]
+    if datas:
+        return f'Período: {min(datas).strftime("%d/%m/%Y")} a {max(datas).strftime("%d/%m/%Y")}'
+    return 'Período: sem data (lançamento sem dia importado)'
+
+
+def resumo_apuracao_leve3(ano_mes: str | None = None) -> list[dict]:
+    """Resumo por fabricante pra mostrar na seção "Apuração para a
+    indústria" sem precisar abrir cada Excel -- pedido do Gabriel
+    (22/09/26, "como ele está visível na nossa ferramenta"): 1 linha por
+    fabricante com nome, período real, nº de linhas e investimento total,
+    ordenado do maior pro menor. Reaproveita `montar_apuracao_leve3` (1
+    chamada por fabricante -- aceitável, são só ~9 hoje) em vez de duplicar
+    a lógica de cálculo."""
+    resumo = []
+    for fabricante in fabricantes_leve3(ano_mes=ano_mes):
+        dados = montar_apuracao_leve3(ano_mes=ano_mes, fabricante=fabricante)
+        if not dados['linhas']:
+            continue
+        resumo.append({
+            'nome': fabricante,
+            'periodo': periodo_texto(dados),
+            'linhas': len(dados['linhas']),
+            'investimento': dados['total_investimento'],
+        })
+    resumo.sort(key=lambda r: r['investimento'], reverse=True)
+    return resumo
+
+
+def resumo_apuracao_industria(mecanica: str, campanhas: list[str], ano_mes: str | None = None) -> list[dict]:
+    """Mesma ideia do `resumo_apuracao_leve3`, pras mecânicas de
+    fabricante (Kenvue/Principia/Botica/Procter) -- 1 linha por campanha
+    que já tem rebaixa cadastrada (`campanhas`, vem de `RebaixaProduto`)."""
+    resumo = []
+    for campanha in campanhas:
+        dados = montar_apuracao_industria(mecanica, campanha, ano_mes=ano_mes)
+        if not dados['linhas']:
+            continue
+        resumo.append({
+            'nome': campanha,
+            'periodo': periodo_texto(dados),
+            'linhas': len(dados['linhas']),
+            'investimento': dados['total_investimento'],
+        })
+    resumo.sort(key=lambda r: r['investimento'], reverse=True)
+    return resumo
+
+
+def escrever_excel_apuracao(df, dados: dict, nome_oferta: str, destino) -> None:
+    """Escreve o .xlsx de apuração com o mesmo cabeçalho de 2 linhas do
+    relatório "Análise de Venda por Item" do ERP (título + "Período: ...")
+    antes da tabela -- pedido do Gabriel (22/09), com foto do relatório
+    de referência -- e uma linha de TOTAL no rodapé (pedido 22/09,
+    reformulação: "não tem total nenhum... a indústria teria que somar
+    2 mil linhas na mão"). `destino` é um caminho (`Path`/str, usado pelo
+    management command) ou um objeto tipo-arquivo (`HttpResponse`, usado
+    pelo botão de download no painel) -- os dois funcionam igual com
+    `pd.ExcelWriter`."""
+    with pd.ExcelWriter(destino, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name='Apuração', startrow=2)
+        ws = writer.sheets['Apuração']
+        ws['A1'] = f'Apuração {nome_oferta}'
+        ws['A1'].font = Font(bold=True)
+        ws['A2'] = periodo_texto(dados)
+
+        if not df.empty:
+            linha_total = 4 + len(df)  # 1=título, 2=período, 3=cabeçalho, 4..=dados
+            borda_topo = Border(top=Side(style='thin'))
+            ws.cell(row=linha_total, column=1, value='TOTAL').font = Font(bold=True)
+            for coluna, indice in zip(df.columns, range(1, len(df.columns) + 1)):
+                celula = ws.cell(row=linha_total, column=indice)
+                if coluna == 'Investimento (R$)':
+                    # NÃO soma a coluna do DataFrame aqui -- ela já veio
+                    # arredondada linha a linha (pra exibição), somar as
+                    # linhas arredondadas dá um total ligeiramente diferente
+                    # do valor certo (mesmo bug de precisão já corrigido
+                    # antes, achado de novo ao testar esta linha de TOTAL:
+                    # R$7.698,42 vs R$7.698,48 reais). `dados['total_investimento']`
+                    # já vem somado em precisão cheia, arredonda só aqui.
+                    celula.value = round(float(dados['total_investimento']), 2)
+                    celula.font = Font(bold=True)
+                elif coluna in COLUNAS_SOMAVEIS:
+                    celula.value = float(df[coluna].sum())
+                    celula.font = Font(bold=True)
+                celula.border = borda_topo
+
+
 def montar_apuracao_industria(mecanica: str, campanha: str, ano_mes: str | None = None) -> dict:
     """Devolve as linhas de venda da campanha (grupo=oferta) + rebaixa/
     investimento por linha, prontas pra exportar. Resolve o EAN de cada
@@ -107,9 +209,8 @@ def montar_apuracao_industria(mecanica: str, campanha: str, ano_mes: str | None 
         queryset = queryset.filter(ano_mes=ano_mes)
     linhas = list(
         queryset.select_related('loja').values(
-            'loja__codigo', 'loja__bandeira', 'data', 'ano_mes',
-            'produto_descricao', 'tag_origem', 'itens', 'venda', 'desconto',
-            'custo', 'lucro',
+            'loja__bandeira', 'data', 'ano_mes',
+            'produto_descricao', 'tag_origem', 'itens', 'venda',
         )
     )
     linhas = [l for l in linhas if tag_sem_prefixo(l['tag_origem']) == campanha]
@@ -137,16 +238,12 @@ def montar_apuracao_industria(mecanica: str, campanha: str, ano_mes: str | None 
 
         itens = l['itens'] or ZERO
         resultado.append({
-            'loja': l['loja__codigo'],
             'bandeira': l['loja__bandeira'],
             'data': l['data'],
             'ean': ean,
             'produto': descricao,
             'itens': itens,
             'venda': l['venda'] or ZERO,
-            'desconto': l['desconto'] or ZERO,
-            'custo': l['custo'] or ZERO,
-            'lucro': l['lucro'] or ZERO,
             'valor_rebaixa_unitario': valor_rebaixa,
             # Sem quantize aqui pelo mesmo motivo do Leve3 (ver
             # montar_apuracao_leve3) -- soma em precisão cheia, arredondar
@@ -178,8 +275,8 @@ def montar_apuracao_leve3(ano_mes: str | None = None, fabricante: str | None = N
     if fabricante:
         queryset = queryset.filter(fabricante=fabricante)
     linhas = queryset.select_related('loja').values(
-        'loja__codigo', 'loja__bandeira', 'data', 'ano_mes',
-        'produto_descricao', 'itens', 'venda', 'custo', 'lucro',
+        'loja__bandeira', 'data', 'ano_mes',
+        'produto_descricao', 'itens', 'venda', 'custo',
     )
 
     resultado = []
@@ -197,15 +294,12 @@ def montar_apuracao_leve3(ano_mes: str | None = None, fabricante: str | None = N
         # não usado pra somar `total_investimento` abaixo).
         investimento = ciclos * custo_unitario
         resultado.append({
-            'loja': l['loja__codigo'],
             'bandeira': l['loja__bandeira'],
             'data': l['data'],
             'ano_mes': l['ano_mes'],
             'produto': l['produto_descricao'],
             'itens': itens,
             'venda': l['venda'] or ZERO,
-            'custo': custo,
-            'lucro': l['lucro'] or ZERO,
             'ciclos': ciclos,
             'custo_unitario': custo_unitario.quantize(Decimal('0.0001')),
             'investimento': investimento,

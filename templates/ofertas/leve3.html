@@ -5,18 +5,11 @@
 
 <h2>Leve 3 Pague 2 <small style="color:var(--muted); font-weight:400;">— genéricos</small></h2>
 
-<p style="color:var(--muted); font-size:12.5px; margin-bottom:6px;">
-  Apuração por fabricante{% if mes_atual %} — {{ mes_atual }}{% else %} — todos os meses{% endif %}:
-</p>
-<div style="margin-bottom:8px;">
-  {% for fab in fabricantes_disponiveis %}
-    <a class="botao-download" href="{% url 'ofertas:exportar_apuracao' 'leve3' %}?fabricante={{ fab|urlencode }}{% if mes_atual %}&mes={{ mes_atual }}{% endif %}">
-      ⬇ {{ fab }}
-    </a>
-  {% empty %}
-    <span class="vazio">Nenhum fabricante identificado ainda.</span>
-  {% endfor %}
-</div>
+{% if apuracao_resumo %}
+  <p style="margin:-8px 0 6px;">
+    <a href="#apuracao-industria" style="color:var(--accent); font-size:12.5px; text-decoration:none;">↓ Apuração para a indústria</a>
+  </p>
+{% endif %}
 
 {% if not kpis.itens %}
   <div class="aviso">
@@ -52,20 +45,23 @@
 </div>
 
 <div class="grafico-card">
-  <h3 style="margin-top:0;">Evolução mensal <small style="color:var(--muted); font-weight:400;">— clique num produto embaixo pra ver a série dele</small></h3>
-  {% if grafico.labels|length <= 1 %}
-    <p style="color:var(--muted); font-size:12.5px;">
-      Só {{ grafico.labels|length }} mês selecionado — com 1 ponto só, o gráfico de linha quase não
-      aparece. Os números certos estão nos cards acima; troque o filtro "Mês" pra "Todos os meses"
-      pra ver a evolução de verdade.
-    </p>
-  {% endif %}
-  <canvas id="grafico-leve3"></canvas>
+  {% include "ofertas/_abas_periodo.html" with id_periodo="leve3" %}
+  <div data-painel="periodo-leve3" data-valor="mes">
+    <h3 style="margin-top:0;">Evolução mensal <small style="color:var(--muted); font-weight:400;">— clique num produto embaixo pra ver a série dele</small></h3>
+    <p style="color:var(--muted); font-size:12.5px;">Venda dividida entre Velanes e Ultra Popular — laranja Velanes, vermelho Ultra Popular. Itens em cinza, à parte.</p>
+    {% if grafico.labels|length <= 1 %}
+      <p style="color:var(--muted); font-size:12.5px;">
+        Só {{ grafico.labels|length }} mês selecionado — com 1 ponto só, o gráfico de barra quase não
+        aparece. Os números certos estão nos cards acima; troque o filtro "Mês" pra "Todos os meses"
+        pra ver a evolução de verdade.
+      </p>
+    {% endif %}
+    <canvas id="grafico-leve3"></canvas>
+  </div>
+  {% include "ofertas/_paineis_periodo.html" with id_periodo="leve3" id_dados_periodo="dados-periodo-leve3" legenda_semana="Cor mostra de quem foi a semana — laranja Velanes, vermelho Ultra Popular." legenda_dia="Cor mostra de quem foi o dia — laranja Velanes, vermelho Ultra Popular." %}
 </div>
 {{ grafico|json_script:"dados-grafico-leve3" }}
 {{ series_produtos|json_script:"dados-series-produtos-leve3" }}
-
-{% include "ofertas/_grafico_semanal.html" with id_semanal="leve3" id_dados_semanal="dados-semanas-leve3" %}
 
 <details class="secao" open>
   <summary>Lojas</summary>
@@ -215,11 +211,13 @@
   {% endfor %}
 {% endfor %}
 
+{% include "ofertas/_apuracao_industria.html" with url_mecanica="leve3" param="fabricante" coluna_titulo="Fabricante" %}
+
 {% endblock %}
 {% block extra_js %}
 <script>
   var dados = JSON.parse(document.getElementById('dados-grafico-leve3').textContent);
-  var chart = graficoBarra('grafico-leve3', dados.labels, dados.series);
+  var chart = graficoBarraMensalBandeira('grafico-leve3', dados);
   ativarCliqueMes(chart, dados.labels);
   var seriesProdutos = JSON.parse(document.getElementById('dados-series-produtos-leve3').textContent);
   var destacarProduto = iniciarDrillDown(chart, seriesProdutos, 'Venda');
@@ -229,9 +227,9 @@
     });
   });
 
-  var dadosSemanas = document.getElementById('dados-semanas-leve3');
-  if (dadosSemanas) {
-    graficoBarraSemanal('grafico-semanal-leve3', JSON.parse(dadosSemanas.textContent));
+  var dadosPeriodoEl = document.getElementById('dados-periodo-leve3');
+  if (dadosPeriodoEl) {
+    montarAbasGraficoPeriodo('leve3', JSON.parse(dadosPeriodoEl.textContent), { modo: 'bandeira' });
   }
 </script>
 {% endblock %}

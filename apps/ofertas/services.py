@@ -139,7 +139,10 @@ def calcular_leve3(queryset, busca: str = ''):
     total_venda = ZERO
     total_margem_contabil = ZERO
 
-    por_mes = defaultdict(lambda: {'itens': ZERO, 'venda': ZERO, 'investimento': ZERO, 'margem_contabil': ZERO, 'margem_ajustada': ZERO})
+    por_mes = defaultdict(lambda: {
+        'itens': ZERO, 'venda': ZERO, 'investimento': ZERO, 'margem_contabil': ZERO,
+        'margem_ajustada': ZERO, '_venda_bandeira': defaultdict(lambda: ZERO),
+    })
     por_loja = defaultdict(lambda: {
         'codigo': '', 'bandeira': '', 'itens': ZERO, 'venda': ZERO,
         'margem_contabil': ZERO, 'margem_ajustada': ZERO, 'investimento': ZERO,
@@ -170,6 +173,7 @@ def calcular_leve3(queryset, busca: str = ''):
         mes['investimento'] += investimento
         mes['margem_contabil'] += lucro
         mes['margem_ajustada'] += margem_ajustada
+        mes['_venda_bandeira'][linha['loja__bandeira']] += venda
 
         loja = por_loja[linha['loja_id']]
         loja['codigo'] = linha['loja__codigo']
@@ -194,6 +198,12 @@ def calcular_leve3(queryset, busca: str = ''):
         if not busca or busca.lower() in nome.lower()
     ]
     produtos.sort(key=lambda p: p['venda'], reverse=True)
+
+    # `bandeira_dominante` por mês -- gráfico "Mês" do Leve3 pintado por
+    # bandeira também (pedido 22/09/26: "no mes, nao foi implantado as
+    # cores das bandeiras?" -- só tinha ido pro Semana/Dia).
+    for mes in por_mes.values():
+        mes.update(_campos_bandeira(mes.pop('_venda_bandeira')))
 
     por_mes_lista = [{'ano_mes': mes, **valores} for mes, valores in sorted(por_mes.items())]
     labels = [item['ano_mes'] for item in por_mes_lista]
@@ -423,14 +433,71 @@ def _meses_antes(ano_mes: str, quantos: int) -> list[str]:
     return meses
 
 
-def serie_semanal(queryset, mes: str | None = None):
-    """Venda por semana (segunda a domingo), com as semanas que tiveram
-    alguma linha `grupo=oferta` marcadas como destaque + % de crescimento
-    vs. a média das semanas sem oferta (pedido 22/09/26 -- ver preview
-    aprovado: "quero VER no gráfico o impacto"). Reaproveitável por
-    qualquer mecânica que tenha `data` preenchida (fabricantes, Kimberly,
-    Leve3, Deu a Louca/Ultra Queimão) -- linha sem `data` (relatório
-    agregado por "Ano-mês") não entra, não dá pra saber a semana dela.
+def _campos_bandeira(venda_bandeira: dict) -> dict:
+    """`venda_bandeira` = `{bandeira: venda_do_período_nela}` -- devolve
+    `bandeira_dominante` (a que mais vendeu, usada no gráfico do Leve3 --
+    roda 1 semana por mês, POR bandeira, em semanas diferentes, pedido
+    22/09/26: "semana de ultra barra vermelha, semana de velanes,
+    laranja") + `venda_velanes`/`venda_ultra_popular` (usadas na barra
+    empilhada das outras mecânicas -- essas rodam nas 2 bandeiras ao
+    mesmo tempo, "de quem foi" não faz sentido, mas "quanto foi de cada"
+    sim; pedido 22/09/26, mesmo dia: "faze isso tambem, para os outros,
+    talvez dividido nas barras"). Sempre calculado, mesmo quando a tela
+    não usa (fica no payload sem custo nenhum)."""
+    return {
+        'bandeira_dominante': max(venda_bandeira, key=venda_bandeira.get) if venda_bandeira else None,
+        'venda_velanes': float(venda_bandeira.get('velanes', ZERO)),
+        'venda_ultra_popular': float(venda_bandeira.get('ultra_popular', ZERO)),
+    }
+
+
+def _periodos_com_destaque(grupos: dict, data_max=None) -> list:
+    """Recebe `{chave_ordenavel: {'venda', 'tem_oferta', 'rotulo', 'tooltip',
+    'parcial'}}` já montado por período (mês/semana/dia) e devolve a lista
+    ordenada com `crescimento_pct` calculado (venda do período vs. média
+    dos períodos SEM oferta e SEM estar parcial) -- lógica compartilhada
+    pelas 3 granularidades do gráfico único "Mês/Semana/Dia" (pedido
+    22/09/26: "prefiro que tenhamos apenas 1 gráfico... escolher olhar
+    por mês, semana ou dia"). `venda`/`crescimento_pct` viram `float` e as
+    datas internas já devem ter virado string antes de chegar aqui --
+    Decimal/date não passam direto pro `json_script` do template."""
+    periodos = [v for _, v in sorted(grupos.items())]
+
+    # Mecânica sem separação base/oferta (Leve3: só importa a venda que
+    # já É a própria oferta, `grupo` nunca vem preenchido) -- toda linha
+    # presente já é, por definição, semana/dia de oferta. Sem esse
+    # fallback, `tem_oferta` comparava sempre contra `grupo=oferta` (que
+    # essas mecânicas nunca usam) e ficava False pra tudo, o gráfico
+    # nunca destacava nada (achado real 22/09/26, Gabriel: "no genérico,
+    # o gráfico não está destacado as semanas que foram da oferta").
+    if periodos and not any(p['tem_oferta'] for p in periodos):
+        for p in periodos:
+            p['tem_oferta'] = True
+
+    vendas_baseline = [p['venda'] for p in periodos if not p['tem_oferta'] and not p['parcial']]
+    media_baseline = (sum(vendas_baseline, ZERO) / len(vendas_baseline)) if vendas_baseline else None
+
+    # Preserva qualquer chave extra que o chamador tenha deixado no grupo
+    # (ex.: `_chave_mes`, usado por `serie_semanal`/`serie_diaria` pra
+    # filtrar por mês DEPOIS de já ter calculado a baseline -- ver comentário
+    # lá) -- só os campos padrão abaixo são garantidos/normalizados.
+    resultado = []
+    for p in periodos:
+        crescimento_pct = (
+            float((p['venda'] / media_baseline - 1) * 100)
+            if p['tem_oferta'] and not p['parcial'] and media_baseline else None
+        )
+        item = dict(p)
+        item.update({'venda': float(p['venda']), 'crescimento_pct': crescimento_pct})
+        resultado.append(item)
+    return resultado
+
+
+def serie_semanal(queryset, mes: str | None = None) -> dict:
+    """Venda por semana (segunda a domingo), semana com `grupo=oferta`
+    destacada + % de crescimento vs. a média das semanas sem oferta.
+    Precisa de `data` -- linha de relatório agregado por "Ano-mês" não
+    entra, não dá pra saber a semana dela.
 
     `queryset` deve vir SEM filtro de mês (achado real: filtrar por mês
     antes de chamar aqui corta ao meio uma semana que cruza a virada do
@@ -440,59 +507,90 @@ def serie_semanal(queryset, mes: str | None = None):
     a média/baseline usa todas as semanas disponíveis no queryset, não só
     as do mês exibido (mais dado, comparação mais robusta, mesma lógica já
     usada no "crescimento" dos KPIs com os 3 meses antes)."""
-    linhas = list(queryset.exclude(data=None).values('data', 'grupo', 'venda'))
+    linhas = list(queryset.exclude(data=None).values('data', 'grupo', 'venda', 'loja__bandeira'))
     if not linhas:
-        return {'semanas': []}
+        return {'periodos': []}
 
     data_max = max(l['data'] for l in linhas)
 
-    por_semana = defaultdict(lambda: {'venda': ZERO, 'tem_oferta': False, 'inicio': None, 'fim': None})
+    grupos = defaultdict(lambda: {'venda': ZERO, 'tem_oferta': False, '_venda_bandeira': defaultdict(lambda: ZERO)})
     for l in linhas:
-        data = l['data']
-        segunda = data - timedelta(days=data.weekday())
+        dia = l['data']
+        segunda = dia - timedelta(days=dia.weekday())
         chave = segunda.isoformat()
-        s = por_semana[chave]
-        s['inicio'] = segunda
-        s['fim'] = segunda + timedelta(days=6)
-        s['venda'] += l['venda'] or ZERO
+        g = grupos[chave]
+        g['venda'] += l['venda'] or ZERO
         if l['grupo'] == Lancamento.GRUPO_OFERTA:
-            s['tem_oferta'] = True
+            g['tem_oferta'] = True
+        g['_venda_bandeira'][l['loja__bandeira']] += l['venda'] or ZERO
+        g['_segunda'] = segunda
 
-    semanas = [v for _, v in sorted(por_semana.items())]
-    # A última semana pode estar pela metade (dado só vai até `data_max`,
-    # não até domingo) -- contar ela como "semana normal" na média, ou
-    # dar % de crescimento nela, compararia 7 dias de verdade contra menos
-    # de 7 dias, dado errado disfarçado de real (achado ao testar: mostrou
-    # "-87%" numa semana que só tinha 1 dia de dado ainda, não é queda
-    # nenhuma). Fica marcada `parcial`, fora da média e sem % nenhum.
-    for s in semanas:
-        s['parcial'] = s['fim'] > data_max
+    for chave, g in grupos.items():
+        segunda = g.pop('_segunda')
+        domingo = segunda + timedelta(days=6)
+        g['rotulo'] = segunda.strftime('%d/%m')
+        g['tooltip'] = f'{segunda.strftime("%d/%m")} a {domingo.strftime("%d/%m")}'
+        # A última semana pode estar pela metade (dado só vai até
+        # `data_max`, não até domingo) -- contar ela na média ou dar % de
+        # crescimento compararia 7 dias de verdade contra menos de 7,
+        # dado errado disfarçado de real (achado ao testar: mostrou
+        # "-87%" numa semana que só tinha 1 dia de dado ainda).
+        g['parcial'] = domingo > data_max
+        g['_chave_mes'] = (segunda.strftime('%Y-%m'), domingo.strftime('%Y-%m'))
+        g.update(_campos_bandeira(g.pop('_venda_bandeira')))
 
-    vendas_baseline = [s['venda'] for s in semanas if not s['tem_oferta'] and not s['parcial']]
-    media_baseline = (sum(vendas_baseline, ZERO) / len(vendas_baseline)) if vendas_baseline else None
-
-    # `inicio`/`fim` viram string ISO e `venda`/`crescimento_pct` viram
-    # float aqui -- mesmo padrão do `grafico_mensal` (Decimal/date não
-    # passam direto pro `json_script` do template sem virar string).
-    semanas_json = []
-    for s in semanas:
-        crescimento_pct = (
-            float((s['venda'] / media_baseline - 1) * 100)
-            if s['tem_oferta'] and not s['parcial'] and media_baseline else None
-        )
-        semanas_json.append({
-            'inicio': s['inicio'].isoformat(),
-            'fim': s['fim'].isoformat(),
-            'venda': float(s['venda']),
-            'tem_oferta': s['tem_oferta'],
-            'parcial': s['parcial'],
-            'crescimento_pct': crescimento_pct,
-        })
-
+    # `_periodos_com_destaque` roda ANTES do filtro de `mes` -- a média/
+    # baseline usa todas as semanas do queryset (histórico completo), `mes`
+    # só decide quais entram no resultado devolvido pro template. Calcular
+    # a baseline DEPOIS de já ter cortado por mês repetiria o mesmo bug já
+    # corrigido antes (Kimberly: -78% numa semana cortada, baseline de
+    # amostra pequena/errada).
+    periodos = _periodos_com_destaque(grupos)
     if mes:
-        semanas_json = [s for s in semanas_json if s['inicio'][:7] == mes or s['fim'][:7] == mes]
+        periodos = [p for p in periodos if mes in p['_chave_mes']]
+    for p in periodos:
+        p.pop('_chave_mes', None)
 
-    return {'semanas': semanas_json}
+    return {'periodos': periodos}
+
+
+def serie_diaria(queryset, mes: str | None = None) -> dict:
+    """Venda por dia, dia com `grupo=oferta` destacado + % de crescimento
+    vs. a média dos dias sem oferta. Precisa de `data`. Mesmo padrão do
+    `serie_semanal`: `queryset` sem filtro de mês (usa todo o histórico
+    disponível pra baseline), `mes` só filtra quais dias aparecem no
+    resultado."""
+    linhas = list(queryset.exclude(data=None).values('data', 'grupo', 'venda', 'loja__bandeira'))
+    if not linhas:
+        return {'periodos': []}
+
+    grupos = defaultdict(lambda: {'venda': ZERO, 'tem_oferta': False, '_venda_bandeira': defaultdict(lambda: ZERO)})
+    for l in linhas:
+        dia = l['data']
+        g = grupos[dia.isoformat()]
+        g['venda'] += l['venda'] or ZERO
+        if l['grupo'] == Lancamento.GRUPO_OFERTA:
+            g['tem_oferta'] = True
+        g['_venda_bandeira'][l['loja__bandeira']] += l['venda'] or ZERO
+        g['_data'] = dia
+
+    for g in grupos.values():
+        dia = g.pop('_data')
+        g['rotulo'] = dia.strftime('%d/%m')
+        g['tooltip'] = dia.strftime('%d/%m/%Y')
+        g['parcial'] = False
+        g['_ano_mes'] = ano_mes_de(dia)
+        g.update(_campos_bandeira(g.pop('_venda_bandeira')))
+
+    # Mesmo padrão do `serie_semanal`: baseline calculada ANTES do filtro
+    # de mês, com o histórico completo.
+    periodos = _periodos_com_destaque(grupos)
+    if mes:
+        periodos = [p for p in periodos if p['_ano_mes'] == mes]
+    for p in periodos:
+        p.pop('_ano_mes', None)
+
+    return {'periodos': periodos}
 
 
 def calcular_impacto_fabricante(queryset, busca: str = '', queryset_baseline=None):

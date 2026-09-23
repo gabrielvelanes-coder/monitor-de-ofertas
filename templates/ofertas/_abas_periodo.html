@@ -1,0 +1,9 @@
+<div class="abas" style="margin-bottom:10px;">
+  <a href="#" class="ativa" data-grupo="periodo-{{ id_periodo }}" data-valor="mes" onclick="alternarPainel(this); return false;">Mês</a>
+  {% if tem_semana %}
+    <a href="#" data-grupo="periodo-{{ id_periodo }}" data-valor="semana" onclick="alternarPainel(this); return false;">Semana</a>
+  {% endif %}
+  {% if tem_dia %}
+    <a href="#" data-grupo="periodo-{{ id_periodo }}" data-valor="dia" onclick="alternarPainel(this); return false;">Dia</a>
+  {% endif %}
+</div>

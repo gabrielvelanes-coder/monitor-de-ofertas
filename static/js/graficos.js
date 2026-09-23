@@ -182,7 +182,16 @@
         delete ativos[nome];
         chart.options.plugins.legend.display = chart.data.datasets.length > 1;
         atualizarVisibilidadeBase();
-        chart.update();
+        // 'none' -- sem isso a animação as vezes trava no frame inicial
+        // (linha nasce em y=0, a animação pra subir até o valor real
+        // nunca termina de rodar) e a linha de destaque fica achatada
+        // no fundo do gráfico pra sempre (achado real 22/09/26, Gabriel:
+        // "quando eu seleciono um item, a linha fica a cima das barras" --
+        // na real ela ficava ACHATADA embaixo, escondida atrás/em cima
+        // das barras baixas, não subia pro valor certo). Sem animação
+        // nesse update, a posição final aplica na hora, sem depender de
+        // requestAnimationFrame terminar.
+        chart.update('none');
         return false;
       }
       if (seriesPorItem[nome]) {
@@ -206,7 +215,7 @@
       }
       chart.options.plugins.legend.display = true;
       atualizarVisibilidadeBase();
-      chart.update();
+      chart.update('none'); // ver comentário acima -- sem isso a linha nova às vezes fica travada em y=0
       return true;
     };
   };
@@ -252,28 +261,96 @@
     return chart;
   };
 
-  // Venda por semana, semana(s) com oferta destacada + % de crescimento
-  // escrito em cima da barra (pedido 22/09/26 -- "preciso VER no gráfico
-  // o impacto, o realizado"; preview aprovado comparando com o gráfico de
-  // linha mensal de sempre). `semanas` = lista de {inicio, fim, venda,
-  // tem_oferta, crescimento_pct}, já vem pronta do back-end
-  // (`serie_semanal`, services.py) -- aqui só desenha.
-  var COR_NORMAL = '#5b8def', COR_DESTAQUE = '#e8628f';
-
-  function rotuloSemana(semana) {
-    var d = new Date(semana.inicio + 'T00:00:00');
-    return (d.getDate() < 10 ? '0' : '') + d.getDate() + '/' + (d.getMonth() < 9 ? '0' : '') + (d.getMonth() + 1);
-  }
-
-  window.graficoBarraSemanal = function (canvasId, semanas) {
+  // Venda do mês EMPILHADA por bandeira (Velanes + Ultra Popular) --
+  // só o Leve3 usa isso (pedido 22/09/26, depois de levar a cor por
+  // bandeira pro Semana/Dia: "no mes, nao foi implantado as cores das
+  // bandeiras?"). 1ª versão pintava a barra inteira pela bandeira
+  // "dominante" do mês -- saía sempre laranja/Velanes em TODO mês
+  // (Velanes vende mais que a Ultra Popular o ano inteiro, mesmo cada
+  // uma rodando sua própria semana), ficava monótono e sem informação
+  // (achado do Gabriel comparando com o Kenvue, rico em cores: "vamos
+  // arrumar isso"). Empilhada mostra a proporção REAL de cada bandeira
+  // por mês. Itens fica numa 3ª barra à parte, cor neutra (cinza) --
+  // não splitada por bandeira, orange bateria com a cor da Velanes e
+  // confundiria (achado do teste anterior, na versão "cor sólida").
+  // `grafico` = `{labels, venda_velanes, venda_ultra_popular, itens}`.
+  window.graficoBarraMensalBandeira = function (canvasId, grafico) {
     var elemento = document.getElementById(canvasId);
-    if (!elemento || !semanas.length) return null;
+    if (!elemento) return null;
 
-    var labels = semanas.map(function (s) { return rotuloSemana(s) + (s.parcial ? '*' : ''); });
-    var dados = semanas.map(function (s) { return s.venda; });
-    var cores = semanas.map(function (s) {
-      if (s.parcial) return 'rgba(91,141,239,.35)'; // semana incompleta, ainda sem 7 dias de dado
-      return s.tem_oferta ? COR_DESTAQUE : COR_NORMAL;
+    var datasets = [
+      {
+        label: maiuscula('Venda Velanes'), stack: 'venda', yAxisID: 'y',
+        data: grafico.venda_velanes, backgroundColor: CORES_BANDEIRA.velanes,
+      },
+      {
+        label: maiuscula('Venda Ultra Popular'), stack: 'venda', yAxisID: 'y',
+        data: grafico.venda_ultra_popular, backgroundColor: CORES_BANDEIRA.ultra_popular,
+      },
+      {
+        label: maiuscula('Itens'), stack: 'itens', yAxisID: 'y1',
+        data: grafico.itens, backgroundColor: '#8b93a1',
+      },
+    ];
+    var seriesInfo = [
+      { label: 'Venda Velanes', eixo: 'moeda' },
+      { label: 'Venda Ultra Popular', eixo: 'moeda' },
+      { label: 'Itens', eixo: 'unidades' },
+    ];
+
+    var chart = new Chart(elemento, {
+      type: 'bar',
+      data: { labels: grafico.labels.map(maiuscula), datasets: datasets },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { display: true, position: 'bottom' },
+          tooltip: { callbacks: { label: callbackTooltip(seriesInfo) } },
+        },
+        scales: {
+          x: { stacked: true },
+          y: { stacked: true, beginAtZero: true, ticks: { callback: function (v) { return formatarEixo('moeda', v); } } },
+          y1: {
+            stacked: true, beginAtZero: true, position: 'right',
+            grid: { drawOnChartArea: false },
+            ticks: { callback: function (v) { return formatarEixo('unidades', v); } },
+          },
+        },
+      },
+    });
+    chart._seriesInfo = seriesInfo;
+    return chart;
+  };
+
+  // Venda por semana/dia, período(s) com oferta destacado + % de
+  // crescimento escrito em cima da barra (pedido 22/09/26 -- "preciso VER
+  // no gráfico o impacto, o realizado"). `periodos` = lista de {rotulo,
+  // tooltip, venda, tem_oferta, parcial, crescimento_pct}, já vem pronta
+  // do back-end (`serie_semanal`/`serie_diaria`, services.py) -- aqui só
+  // desenha. Mesmo formato pras 2 granularidades, 1 função só desenha as
+  // 2 (usada nas abas Semana/Dia do gráfico único -- a aba Mês continua
+  // no `graficoBarra` de sempre, com drill-down por produto e clique
+  // pra filtrar mês, que esse formato mais simples não tem).
+  var COR_NORMAL = '#5b8def', COR_DESTAQUE = '#e8628f';
+  // Leve3 roda 1 semana por mês, POR bandeira, em semanas diferentes
+  // entre Velanes/Ultra Popular -- "destaque por oferta" não diz nada
+  // (toda semana com dado já é oferta, ver `_periodos_com_destaque`),
+  // então lá a cor mostra de QUEM foi a semana em vez de SE teve oferta
+  // (pedido 22/09/26: "semana de ultra barra vermelha, semana de
+  // velanes, laranja"). `graficoBarraDestaque(..., {modo:'bandeira'})`.
+  var CORES_BANDEIRA = { velanes: '#ef9f5b', ultra_popular: '#e5484d' };
+
+  window.graficoBarraDestaque = function (canvasId, periodos, opcoes) {
+    var elemento = document.getElementById(canvasId);
+    if (!elemento || !periodos.length) return null;
+    var porBandeira = opcoes && opcoes.modo === 'bandeira';
+
+    var labels = periodos.map(function (p) { return p.rotulo + (p.parcial ? '*' : ''); });
+    var dados = periodos.map(function (p) { return p.venda; });
+    var cores = periodos.map(function (p) {
+      if (p.parcial) return 'rgba(91,141,239,.35)'; // período incompleto, ainda sem todos os dias de dado
+      if (porBandeira) return CORES_BANDEIRA[p.bandeira_dominante] || COR_NORMAL;
+      return p.tem_oferta ? COR_DESTAQUE : COR_NORMAL;
     });
 
     var rotuloImpacto = {
@@ -285,10 +362,10 @@
         ctx.font = '700 12px -apple-system, "Segoe UI", Roboto, sans-serif';
         ctx.textAlign = 'center';
         ctx.fillStyle = COR_DESTAQUE;
-        semanas.forEach(function (s, i) {
-          if (s.crescimento_pct === null || s.crescimento_pct === undefined) return;
-          var seta = s.crescimento_pct >= 0 ? '▲ +' : '▼ ';
-          var texto = seta + Math.abs(s.crescimento_pct).toFixed(0) + '%';
+        periodos.forEach(function (p, i) {
+          if (porBandeira || p.crescimento_pct === null || p.crescimento_pct === undefined) return;
+          var seta = p.crescimento_pct >= 0 ? '▲ +' : '▼ ';
+          var texto = seta + Math.abs(p.crescimento_pct).toFixed(0) + '%';
           var elem = meta.data[i];
           ctx.fillText(texto, elem.x, elem.y - 10);
         });
@@ -307,10 +384,7 @@
           legend: { display: false },
           tooltip: {
             callbacks: {
-              title: function (itens) {
-                var s = semanas[itens[0].dataIndex];
-                return s.inicio.split('-').reverse().join('/') + ' a ' + s.fim.split('-').reverse().join('/');
-              },
+              title: function (itens) { return periodos[itens[0].dataIndex].tooltip; },
               label: function (ctx) { return 'Venda: ' + formatarNumeroBR(ctx.parsed.y, 2).replace(/^/, 'R$ '); },
             },
           },
@@ -321,6 +395,122 @@
         },
       },
       plugins: [rotuloImpacto],
+    });
+  };
+
+  // Barra empilhada por bandeira (Velanes + Ultra Popular), pedido
+  // 22/09/26 logo depois do modo "1 cor só" do Leve3 -- "faze isso
+  // tambem, para os outros, talvez dividido nas barras". Diferente do
+  // Leve3 (que roda 1 semana por bandeira, "de quem foi a semana" é a
+  // pergunta certa), essas mecânicas rodam nas 2 bandeiras ao MESMO
+  // TEMPO -- o sinal que importa continua sendo oferta/não-oferta (o
+  // "impacto" que motivou o gráfico), a bandeira aqui é só a proporção
+  // DENTRO da barra. Por isso cada segmento usa a MESMA família de cor
+  // do destaque por oferta (rosa/azul), só numa tonalidade própria pra
+  // dar pra distinguir Velanes de Ultra Popular dentro da pilha.
+  var CORES_OFERTA_BANDEIRA = {
+    velanes: { normal: COR_NORMAL, destaque: COR_DESTAQUE },
+    ultra_popular: { normal: '#3f6bc4', destaque: '#c94c72' },
+  };
+
+  window.graficoBarraEmpilhadaBandeira = function (canvasId, periodos) {
+    var elemento = document.getElementById(canvasId);
+    if (!elemento || !periodos.length) return null;
+
+    var labels = periodos.map(function (p) { return p.rotulo + (p.parcial ? '*' : ''); });
+
+    function corSegmento(p, bandeira) {
+      if (p.parcial) return 'rgba(91,141,239,.35)';
+      var cores = CORES_OFERTA_BANDEIRA[bandeira];
+      return p.tem_oferta ? cores.destaque : cores.normal;
+    }
+
+    var datasets = [
+      {
+        label: 'Velanes', stack: 'venda', borderRadius: 4,
+        data: periodos.map(function (p) { return p.venda_velanes; }),
+        backgroundColor: periodos.map(function (p) { return corSegmento(p, 'velanes'); }),
+      },
+      {
+        label: 'Ultra Popular', stack: 'venda', borderRadius: 4,
+        data: periodos.map(function (p) { return p.venda_ultra_popular; }),
+        backgroundColor: periodos.map(function (p) { return corSegmento(p, 'ultra_popular'); }),
+      },
+    ];
+
+    var rotuloImpacto = {
+      id: 'rotuloImpacto',
+      afterDatasetsDraw: function (chart) {
+        var ctx = chart.ctx;
+        // Topo da pilha = topo do ÚLTIMO dataset desenhado (Ultra
+        // Popular, empilhado por cima do Velanes) -- rótulo tem que ficar
+        // acima da barra inteira, não só do pedaço de cima.
+        var metaTopo = chart.getDatasetMeta(datasets.length - 1);
+        ctx.save();
+        ctx.font = '700 12px -apple-system, "Segoe UI", Roboto, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = COR_DESTAQUE;
+        periodos.forEach(function (p, i) {
+          if (p.crescimento_pct === null || p.crescimento_pct === undefined) return;
+          var seta = p.crescimento_pct >= 0 ? '▲ +' : '▼ ';
+          var texto = seta + Math.abs(p.crescimento_pct).toFixed(0) + '%';
+          var elem = metaTopo.data[i];
+          ctx.fillText(texto, elem.x, elem.y - 10);
+        });
+        ctx.restore();
+      },
+    };
+
+    return new Chart(elemento, {
+      type: 'bar',
+      data: { labels: labels, datasets: datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        layout: { padding: { top: 24 } },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              title: function (itens) { return periodos[itens[0].dataIndex].tooltip; },
+              label: function (ctx) { return ctx.dataset.label + ': ' + formatarNumeroBR(ctx.parsed.y, 2).replace(/^/, 'R$ '); },
+            },
+          },
+        },
+        scales: {
+          x: { stacked: true, grid: { display: false } },
+          y: { stacked: true, beginAtZero: true, ticks: { callback: function (v) { return 'R$ ' + formatarNumeroBR(v, 0); } } },
+        },
+      },
+      plugins: [rotuloImpacto],
+    });
+  };
+
+  // Gráfico único "Mês / Semana / Dia" (pedido 22/09/26 -- "prefiro que
+  // tenhamos apenas 1 gráfico"): a aba Mês já é montada por fora (mesmo
+  // `graficoBarra` de sempre, com drill-down/clique-pra-filtrar) -- essa
+  // função só cuida de criar Semana/Dia SOB DEMANDA, no 1º clique na aba
+  // (não de cara: o canvas nasce dentro de um painel `hidden`, e criar um
+  // Chart.js num canvas de altura 0 desenha em branco -- já foi bug real
+  // nesta tela, "graficoBarraSemanal is not defined"/canvas vazio).
+  // `idBase` é o mesmo passado nos 3 `data-grupo="periodo-<idBase>"` do
+  // template; `dadosPeriodo` = `{semana: [...], dia: [...]}`.
+  window.montarAbasGraficoPeriodo = function (idBase, dadosPeriodo, opcoes) {
+    var grupo = 'periodo-' + idBase;
+    var criados = {};
+    document.querySelectorAll('[data-grupo="' + grupo + '"]').forEach(function (aba) {
+      var valor = aba.dataset.valor;
+      if (valor === 'mes' || !dadosPeriodo[valor] || !dadosPeriodo[valor].length) return;
+      aba.addEventListener('click', function () {
+        if (criados[valor]) return;
+        criados[valor] = true;
+        var canvasId = 'grafico-' + valor + '-' + idBase;
+        if (opcoes && opcoes.modo === 'bandeira-empilhada') {
+          graficoBarraEmpilhadaBandeira(canvasId, dadosPeriodo[valor]);
+        } else {
+          graficoBarraDestaque(canvasId, dadosPeriodo[valor], opcoes);
+        }
+      });
     });
   };
 })();

@@ -3,7 +3,8 @@ from pathlib import Path
 from django.core.management.base import BaseCommand, CommandError
 
 from apps.ofertas.apuracao import (
-    fabricantes_leve3, gerar_dataframe_apuracao, nome_arquivo_apuracao,
+    escrever_excel_apuracao, fabricantes_leve3, gerar_dataframe_apuracao,
+    nome_arquivo_apuracao,
 )
 from apps.ofertas.models import Lancamento
 
@@ -63,7 +64,7 @@ class Command(BaseCommand):
         nome_oferta = fabricante if mecanica == Lancamento.LEVE3 else campanha
         saida_dir.mkdir(parents=True, exist_ok=True)
         saida = saida_dir / nome_arquivo_apuracao(nome_oferta, ano_mes)
-        df.to_excel(saida, index=False, sheet_name='Apuração')
+        escrever_excel_apuracao(df, dados, nome_oferta, saida)
 
         self.stdout.write(self.style.SUCCESS(
             f"Apuração [{nome_oferta}{' - ' + ano_mes if ano_mes else ''}]: {len(df)} linhas, "

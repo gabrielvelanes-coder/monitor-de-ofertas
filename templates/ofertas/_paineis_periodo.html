@@ -1,0 +1,13 @@
+{% if tem_semana %}
+  <div data-painel="periodo-{{ id_periodo }}" data-valor="semana" hidden>
+    <p style="color:var(--muted); font-size:12.5px;">{{ legenda_semana|default:"Semana com oferta em destaque, % vs. semana normal." }}</p>
+    <div style="height:260px; position:relative;"><canvas id="grafico-semana-{{ id_periodo }}"></canvas></div>
+  </div>
+{% endif %}
+{% if tem_dia %}
+  <div data-painel="periodo-{{ id_periodo }}" data-valor="dia" hidden>
+    <p style="color:var(--muted); font-size:12.5px;">{{ legenda_dia|default:"Dia com oferta em destaque, % vs. dia normal." }}</p>
+    <div style="height:260px; position:relative;"><canvas id="grafico-dia-{{ id_periodo }}"></canvas></div>
+  </div>
+{% endif %}
+{{ dados_periodo|json_script:id_dados_periodo }}
