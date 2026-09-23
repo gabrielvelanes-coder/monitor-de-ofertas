@@ -29,7 +29,7 @@ ZERO = Decimal('0')
 FABRICANTES = {
     'kenvue': (Lancamento.KENVUE, 'Kenvue'),
     'principia': (Lancamento.PRINCIPIA, 'Principia'),
-    'botica': (Lancamento.BOTICA, 'Botica Nacional'),
+    'botica': (Lancamento.BOTICA, 'Botica'),
     'procter': (Lancamento.PROCTER, 'Procter & Gamble'),
 }
 

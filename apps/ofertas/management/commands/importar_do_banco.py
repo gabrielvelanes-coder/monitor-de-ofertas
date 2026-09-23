@@ -27,11 +27,15 @@ from apps.ofertas.importadores import importar_relatorio_fabricante
 from apps.ofertas.management.commands.importar_botica import TAGS_BOTICA
 from apps.ofertas.models import Lancamento
 
-# mecânica -> (tag(s) da oferta, rótulo do fabricante no painel, filtro ILIKE do fabricante no ERP)
+# mecânica -> (tag(s) da oferta, rótulo do fabricante no painel, filtro do fabricante no ERP:
+# 1 padrão ILIKE ou uma lista de nomes EXATOS quando agrupa mais de 1 fabricante do ERP)
 MECANICAS = {
     'kenvue': (Lancamento.KENVUE, 'PROMOÇÃO KENVUE', 'Kenvue', '%KENVUE%'),
     'principia': (Lancamento.PRINCIPIA, 'PROMOÇÃO PRINCIPIA 15 %', 'Principia', '%PRINCIPIA%'),
-    'botica': (Lancamento.BOTICA, TAGS_BOTICA, 'Botica Nacional', '%BOTICA%'),
+    # Confirmado com o Gabriel (23/09/26): o grupo "Botica" no painel é
+    # Botica + Siage + Vult -- NÃO inclui "BOTICA LA PIEL" (fabricante
+    # separado no ERP, achado ao investigar a divergência banco x planilha).
+    'botica': (Lancamento.BOTICA, TAGS_BOTICA, 'Botica', ['BOTICA', 'SIAGE EUDORA', 'VULT']),
 }
 INICIO_PADRAO = date(2026, 1, 1)
 ORIGEM = 'banco'

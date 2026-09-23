@@ -58,7 +58,7 @@ LEFT JOIN movimentacaoestoque me ON me.id = iv.movimentacaoestoqueid
 WHERE iv.status = 'F'  -- item finalizado (C/D = item cancelado/devolvido, fora do relatório do ERP)
   AND iv.datahora >= %(inicio)s
   AND iv.datahora <  %(fim)s
-  AND pf.nome ILIKE %(fabricante)s
+  AND {filtro_fabricante}
 GROUP BY 1, 2, 3, 4, 5, 6
 ORDER BY 2, 1, 3
 """
@@ -104,15 +104,26 @@ def conectar():
     )
 
 
-def consultar_venda_por_item(inicio: date, fim: date, fabricante_like: str) -> pd.DataFrame:
+def consultar_venda_por_item(inicio: date, fim: date, fabricante_like: str | list[str]) -> pd.DataFrame:
     """Equivalente ao .xls "Análise de Venda por Item" filtrado por
     fabricante, de `inicio` (inclusive) a `fim` (exclusive).
 
     `fabricante_like`: padrão ILIKE do nome do fabricante no ERP (ex.
-    '%KENVUE%')."""
+    '%KENVUE%'), OU uma lista de nomes EXATOS quando a mecânica agrupa mais
+    de 1 fabricante do ERP (ex. Botica: `['BOTICA', 'SIAGE EUDORA', 'VULT']`
+    -- confirmado com o Gabriel 23/09/26; exclui de propósito 'BOTICA LA
+    PIEL', que é outro fabricante, não faz parte do grupo)."""
+    if isinstance(fabricante_like, str):
+        filtro_fabricante = 'pf.nome ILIKE %(fabricante)s'
+        parametro_fabricante = fabricante_like
+    else:
+        filtro_fabricante = 'pf.nome = ANY(%(fabricante)s)'
+        parametro_fabricante = list(fabricante_like)
+
+    consulta = CONSULTA_VENDA_POR_ITEM.format(filtro_fabricante=filtro_fabricante)
     with conectar() as conn, conn.cursor() as cur:
-        cur.execute(CONSULTA_VENDA_POR_ITEM, {
-            'inicio': inicio, 'fim': fim, 'fabricante': fabricante_like,
+        cur.execute(consulta, {
+            'inicio': inicio, 'fim': fim, 'fabricante': parametro_fabricante,
         })
         colunas = [d.name for d in cur.description]
         df = pd.DataFrame(cur.fetchall(), columns=colunas)

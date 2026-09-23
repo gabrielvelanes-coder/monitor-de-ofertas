@@ -74,22 +74,33 @@ Como rodar (PowerShell, na pasta `painel-ofertas`, sem precisar ativar o venv):
 |---|---|---|
 | Kenvue | ✅ 0,00% em todos os meses (R$ 1.438.523,71) | ✅ Sim — 44.036 lançamentos, dados até 22/09 |
 | Principia | ✅ 0,00% em todos os meses (R$ 350.294,05) | ✅ Sim — 6.386 lançamentos (fabricante PRINCIPIA SKINCARE), dados até 22/09 |
-| Botica | ⚠️ +0,22% (jan-jul; ago-set e oferta batem 100%) | ❌ Não |
+| Botica | Grupo redefinido — ver nota abaixo | ✅ Sim — 20.056 lançamentos, dados até 22/09 |
 | Procter | não configurada ainda | ❌ |
 | Leve 3, Kimberly, Cestões, Marketing, Supra Corp, Deu a Louca/Ultra Queimão, Sellout | não configuradas ainda | ❌ |
+
+**Botica — achado e decisão (23/09/26):** o banco tem 4 fabricantes que batem
+`%BOTICA%`/relacionados: `BOTICA`, `BOTICA LA PIEL`, `SIAGE EUDORA`, `VULT`.
+A planilha histórica só cobria `BOTICA` sozinho (validado: bank-só-BOTICA de
+jan/26 = R$45.221,97 = exatamente o valor da planilha). Perguntado ao
+Gabriel, ele confirmou: o grupo certo é **Botica + Siage + Vult** — `BOTICA
+LA PIEL` (R$191,62 em jan/26) fica de fora, é outro fabricante. Conferido
+que Siage e Vult carregam de fato a mesma tag `OFERTAS BOTICA` (ex. Siage
+R$14.425,90 em oferta em março/26) — não é erro de dado, é campanha nacional
+cobrindo as 3 marcas. `MECANICAS['botica']` em `importar_do_banco.py` usa
+lista de nomes exatos (`pf.nome = ANY(...)`) em vez do padrão ILIKE único —
+`consultar_venda_por_item` (`erp_banco.py`) aceita os dois formatos agora.
+Rótulo no painel mudou de "Botica Nacional" pra "Botica" (o "Nacional" era
+só o nome de 1 das 3 tags, ficou confuso agora que a tela cobre os 3
+fabricantes). Carga completa gravada (20.056 lançamentos, substituindo os
+3.598 da planilha antiga).
 
 Backup do painel antes da 1ª gravação: `db.sqlite3.bak-antes-banco`
 (para voltar: fechar o painel e copiar esse arquivo por cima de `db.sqlite3`).
 
 ## Próximos passos
 
-1. **Conferir o painel** (telas Kenvue e Principia, ambas já gravadas do banco).
-2. **Botica**: o banco achou 2 fabricantes, `BOTICA` e `BOTICA LA PIEL`.
-   Suspeita: a planilha foi exportada só com `BOTICA`. Rodar no DBeaver a
-   venda mensal por fabricante (`pf.nome ILIKE '%BOTICA%'`) e ver se
-   `BOTICA LA PIEL` jan/26 = R$ 191,62. Depois o Gabriel decide: só
-   `BOTICA` (igual planilha) ou incluir La Piel. Ajuste é trocar o filtro
-   em `MECANICAS['botica']` (ou aceitar lista de fabricantes).
+1. **Conferir o painel** (telas Kenvue, Principia e Botica, já gravadas do banco).
+2. ~~Botica~~ — resolvido, ver nota acima (grupo Botica+Siage+Vult, gravado).
 3. **Procter**: 2 campanhas no mesmo fabricante (mensal
    `PROMOÇÃO PROCTER` + `OFERTAS PROCTER SEMANA DO CLIENTE`), hoje
    importadas de arquivos separados com `escopo_delete='arquivo'`.

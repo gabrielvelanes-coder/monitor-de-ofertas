@@ -29,7 +29,7 @@ class Command(BaseCommand):
             '*baseline*botica*.xls'
         )
         resultado = importar_relatorio_fabricante(
-            caminho, Lancamento.BOTICA, TAGS_BOTICA, fabricante='Botica Nacional',
+            caminho, Lancamento.BOTICA, TAGS_BOTICA, fabricante='Botica',
         )
         self.stdout.write(self.style.SUCCESS(
             f"Botica: {resultado['importados']} lançamentos importados "
