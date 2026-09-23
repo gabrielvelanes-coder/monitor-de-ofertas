@@ -76,7 +76,8 @@ Como rodar (PowerShell, na pasta `painel-ofertas`, sem precisar ativar o venv):
 | Principia | ✅ 0,00% em todos os meses (R$ 350.294,05) | ✅ Sim — 6.386 lançamentos (fabricante PRINCIPIA SKINCARE), dados até 22/09 |
 | Botica | Grupo redefinido — ver nota abaixo | ✅ Sim — 20.056 lançamentos, dados até 22/09 |
 | Procter | ✅ 0,00% em todos os meses (R$ 1.726.074,65), oferta 0,00% | ✅ Sim — 60.647 lançamentos, dados até 22/09 |
-| Leve 3, Kimberly, Cestões, Marketing, Supra Corp, Deu a Louca/Ultra Queimão, Sellout | não configuradas ainda | ❌ |
+| Marketing | ✅ 0,00% em agosto (único mês que a planilha tinha) | ✅ Sim — 80.494 lançamentos, jan-set/26 inteiro (planilha só tinha agosto) |
+| Leve 3, Kimberly, Cestões, Supra Corp, Deu a Louca/Ultra Queimão, Sellout | não configuradas ainda | ❌ |
 
 **Botica — achado e decisão (23/09/26):** o banco tem 4 fabricantes que batem
 `%BOTICA%`/relacionados: `BOTICA`, `BOTICA LA PIEL`, `SIAGE EUDORA`, `VULT`.
@@ -108,15 +109,30 @@ substitui o fluxo antigo de 2 arquivos/2 comandos com
 continua batendo 189 linhas/R$650,00 de investimento (RebaixaProduto),
 idêntico a antes do import do banco.
 
+**Marketing — achado e decisão (23/09/26):** mecânica diferente das 4
+anteriores — não é de 1 fabricante, filtra pelo nome do caderno de oferta
+("PRODUTOS MARKETING <mês>"). `importar_do_banco` generalizado com um
+"tipo" (`'fabricante'` vs `'tag'`) — tipo `'tag'` usa `consultar_venda_por_tag`
+(filtro `co.nome ILIKE`, qualquer fabricante) e `importar_relatorio_fabricante`
+com `fabricante=None` (usa o fabricante por linha do banco, já que a
+mecânica espalha por ~65 fabricantes diferentes). Validado: agosto bate
+0,00% com a planilha antiga (único mês que ela tinha). **Achado bom:** o
+banco já tem jan-set/26 inteiro (80.494 linhas) — resolve de graça a
+pendência registrada em 17/09/26 ("Marketing só tem 1 mês, preciso o
+Gabriel mandar mais"), sem precisar pedir nada a ele.
+
 Backup do painel antes da 1ª gravação: `db.sqlite3.bak-antes-banco`
 (para voltar: fechar o painel e copiar esse arquivo por cima de `db.sqlite3`).
 
 ## Próximos passos
 
-1. **Conferir o painel** (telas Kenvue, Principia, Botica e Procter, já gravadas do banco).
+1. **Conferir o painel** (telas Kenvue, Principia, Botica, Procter e
+   Marketing, já gravadas do banco).
 2. ~~Botica~~ — resolvido, ver nota acima (grupo Botica+Siage+Vult, gravado).
 3. ~~Procter~~ — resolvido, ver nota acima (2 campanhas numa consulta só via
    `tag_alvo` em lista, `PROCTER FARMA` fica de fora, gravado).
+3b. ~~Marketing~~ — resolvido, ver nota acima (tipo `'tag'` novo,
+   `fabricante=None`, jan-set/26 inteiro gravado).
 4. ~~Botão "Atualizar agora"~~ — resolvido (23/09/26): botão no menu
    "Sistema" do painel, `views.atualizar_agora` roda `importar_do_banco
    todas --dias 7` na hora e mostra mensagem de sucesso/erro.
@@ -128,8 +144,12 @@ Backup do painel antes da 1ª gravação: `db.sqlite3.bak-antes-banco`
    pelo modo automático do Claude Code por mudar o sistema — ver instrução
    deixada pro Gabriel rodar com `!` ou pelo Agendador de Tarefas na UI).
    O computador precisa estar ligado no horário.
-6. Demais mecânicas (Leve 3, Kimberly, Cestões, Marketing, etc.), uma a
-   uma, sempre com `--comparar` antes de gravar. Cadernos de oferta,
+6. Demais mecânicas (Leve 3, Kimberly, Cestões, Supra Corp, Deu a Louca/
+   Ultra Queimão, Sellout), uma a uma, sempre com `--comparar` antes de
+   gravar. Cestões precisa de um 3º "tipo" de consulta (achar produtos que
+   já tiveram a tag, depois trazer o histórico completo DESSES produtos
+   independente de fabricante/tag — `consultar_venda_por_produtos` já
+   pronta em `erp_banco.py`, falta ligar no `importar_do_banco`). Cadernos de oferta,
    produtos e itens de caderno também estão no banco
    (`cadernooferta`, `itemcadernooferta`, `unidadenegocioparticipantecadernooferta`)
    — dá pra substituir planilhas de cadastro no futuro.
