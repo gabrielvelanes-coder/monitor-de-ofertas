@@ -18,6 +18,7 @@ Guarda em `OneDrive\\Área de Trabalho\\BACKUPS DB\\painel-ofertas\\`:
 """
 from __future__ import annotations
 
+import os
 import shutil
 import sqlite3
 import sys
@@ -29,7 +30,13 @@ MANTER_RODADAS_DADOS = 5
 
 PASTA_PROJETO = Path(__file__).resolve().parent
 PASTA_BACKUPS = PASTA_PROJETO.parent.parent / "BACKUPS DB" / "painel-ofertas"
-CAMINHO_DB = PASTA_PROJETO / "db.sqlite3"
+# O banco vive FORA da pasta do projeto desde 23/09/26 (OneDrive deixava
+# toda consulta lenta, ver commit da mudança) -- mesmo caminho padrão e
+# mesma variável de ambiente (PAINEL_DB_PATH) de `config/settings.py`.
+CAMINHO_DB = Path(
+    os.environ.get("PAINEL_DB_PATH")
+    or r"C:\Users\E.C Velanes\painel-ofertas-dados\db.sqlite3"
+)
 PASTA_DADOS_ENTRADA = PASTA_PROJETO / "dados" / "entrada"
 
 

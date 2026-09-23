@@ -228,7 +228,23 @@ extra. Gravado: 17.446 (Deu a Louca) + 5.667 (Ultra Queimão)
 lançamentos.
 
 Backup do painel antes da 1ª gravação: `db.sqlite3.bak-antes-banco`
-(para voltar: fechar o painel e copiar esse arquivo por cima de `db.sqlite3`).
+(para voltar: fechar o painel e copiar esse arquivo por cima de
+`db.sqlite3` — os dois ficam em `C:\Users\E.C Velanes\painel-ofertas-
+dados\` desde 23/09/26, ver seção "Banco fora do OneDrive" abaixo).
+
+## Banco fora do OneDrive (23/09/26)
+
+O `db.sqlite3` foi movido pra fora da pasta do projeto (que é
+sincronizada pelo OneDrive) — o Gabriel notou o painel lento, e o
+OneDrive monitorando/sincronizando o arquivo a cada escrita era a causa
+principal (medido: consulta de 227 mil linhas caiu de 27,4s pra 1,8s só
+de mover). Agora fica em `C:\Users\E.C Velanes\painel-ofertas-dados\
+db.sqlite3`, configurável via `PAINEL_DB_PATH` (`config/settings.py` e
+`backup_tudo.py` leem a mesma variável). O backup diário continua indo
+pro OneDrive (`backup_tudo.py`, sem mudança de comportamento) — só o
+arquivo "vivo" que passou a ficar local. 2 índices novos também
+(`mecanica+fabricante`, `mecanica+data`) — o Sellout (227 mil linhas)
+não tinha nenhum cobrindo consulta por fabricante.
 
 ## Próximos passos
 

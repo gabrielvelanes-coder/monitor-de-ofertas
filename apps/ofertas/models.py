@@ -86,6 +86,12 @@ class Lancamento(models.Model):
         indexes = [
             models.Index(fields=['mecanica', 'ano_mes']),
             models.Index(fields=['mecanica', 'loja']),
+            # Sellout (23/09/26): 227 mil linhas, filtrado por fabricante em
+            # toda consulta de impacto do Leve3 -- sem índice, tabela
+            # inteira era varrida linha a linha (medido: ~9,6s só nesse
+            # filtro antes do índice).
+            models.Index(fields=['mecanica', 'fabricante']),
+            models.Index(fields=['mecanica', 'data']),
         ]
 
     def __str__(self):

@@ -76,10 +76,24 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.1/ref/settings/#databases
 
+# O banco fica FORA da pasta do projeto (que é sincronizada pelo OneDrive)
+# de propósito -- 23/09/26: o OneDrive monitora/sincroniza o arquivo a cada
+# escrita, e isso deixava toda consulta MUITO mais lenta (medido: uma
+# consulta de 227 mil linhas caiu de 27,4s pra 1,8s só de mover o arquivo
+# pra fora). O backup diário (`backup_tudo.py`) continua copiando uma cópia
+# pro OneDrive -- só o arquivo "vivo" que fica local. Pode ser sobrescrito
+# com a variável de ambiente PAINEL_DB_PATH se o caminho mudar de máquina.
+import os
+
+CAMINHO_BANCO = Path(
+    os.environ.get('PAINEL_DB_PATH')
+    or r'C:\Users\E.C Velanes\painel-ofertas-dados\db.sqlite3'
+)
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'NAME': CAMINHO_BANCO,
     }
 }
 
