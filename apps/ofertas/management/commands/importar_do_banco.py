@@ -8,9 +8,7 @@ Uso:
     python manage.py importar_do_banco kenvue --dias 7      # atualização incremental (últimos 7 dias)
     python manage.py importar_do_banco todas --dias 7       # todas as mecânicas já liberadas
 
-Piloto (23/09/26): Kenvue, Principia e Botica. Procter fica de fora por
-enquanto -- tem 2 campanhas no mesmo fabricante (mensal + Semana do
-Cliente) importadas de arquivos separados, precisa de tratamento próprio.
+Piloto (23/09/26): Kenvue, Principia, Botica e Procter.
 """
 from __future__ import annotations
 
@@ -27,6 +25,13 @@ from apps.ofertas.importadores import importar_relatorio_fabricante
 from apps.ofertas.management.commands.importar_botica import TAGS_BOTICA
 from apps.ofertas.models import Lancamento
 
+# 2 tags = 2 campanhas coexistindo na mesma tela (promoção mensal + Semana
+# do Cliente) -- `importar_relatorio_fabricante` já separa por campanha
+# (agrupa por `tag_origem`) quando `tag_alvo` é uma lista, mesmo mecanismo
+# usado pro Botica. Isso substitui o fluxo antigo de 2 arquivos/2 comandos
+# com `escopo_delete='arquivo'` -- o banco traz os 2 numa consulta só.
+TAGS_PROCTER = ['PROMOÇÃO PROCTER', 'OFERTAS PROCTER SEMANA DO CLIENTE']
+
 # mecânica -> (tag(s) da oferta, rótulo do fabricante no painel, filtro do fabricante no ERP:
 # 1 padrão ILIKE ou uma lista de nomes EXATOS quando agrupa mais de 1 fabricante do ERP)
 MECANICAS = {
@@ -36,6 +41,13 @@ MECANICAS = {
     # Botica + Siage + Vult -- NÃO inclui "BOTICA LA PIEL" (fabricante
     # separado no ERP, achado ao investigar a divergência banco x planilha).
     'botica': (Lancamento.BOTICA, TAGS_BOTICA, 'Botica', ['BOTICA', 'SIAGE EUDORA', 'VULT']),
+    # Achado (23/09/26): o banco tem "PROCTER & GAMBLE" e "PROCTER FARMA"
+    # separados -- diferente do Botica/Siage/Vult, "PROCTER FARMA" (R$42mil
+    # em jan/26 sozinho, nada pequeno) NÃO carrega nenhuma das 2 tags de
+    # oferta em nenhum mês (jan-set/26 conferido) -- não participa da
+    # promoção, fica de fora sem precisar perguntar ao Gabriel. String sem
+    # "%" = ILIKE exato (case-insensitive), não pega "PROCTER FARMA".
+    'procter': (Lancamento.PROCTER, TAGS_PROCTER, 'Procter & Gamble', 'PROCTER & GAMBLE'),
 }
 INICIO_PADRAO = date(2026, 1, 1)
 ORIGEM = 'banco'

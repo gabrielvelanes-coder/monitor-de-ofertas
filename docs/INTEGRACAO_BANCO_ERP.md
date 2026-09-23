@@ -75,7 +75,7 @@ Como rodar (PowerShell, na pasta `painel-ofertas`, sem precisar ativar o venv):
 | Kenvue | ✅ 0,00% em todos os meses (R$ 1.438.523,71) | ✅ Sim — 44.036 lançamentos, dados até 22/09 |
 | Principia | ✅ 0,00% em todos os meses (R$ 350.294,05) | ✅ Sim — 6.386 lançamentos (fabricante PRINCIPIA SKINCARE), dados até 22/09 |
 | Botica | Grupo redefinido — ver nota abaixo | ✅ Sim — 20.056 lançamentos, dados até 22/09 |
-| Procter | não configurada ainda | ❌ |
+| Procter | ✅ 0,00% em todos os meses (R$ 1.726.074,65), oferta 0,00% | ✅ Sim — 60.647 lançamentos, dados até 22/09 |
 | Leve 3, Kimberly, Cestões, Marketing, Supra Corp, Deu a Louca/Ultra Queimão, Sellout | não configuradas ainda | ❌ |
 
 **Botica — achado e decisão (23/09/26):** o banco tem 4 fabricantes que batem
@@ -94,17 +94,29 @@ só o nome de 1 das 3 tags, ficou confuso agora que a tela cobre os 3
 fabricantes). Carga completa gravada (20.056 lançamentos, substituindo os
 3.598 da planilha antiga).
 
+**Procter — achado e decisão (23/09/26):** o banco tem `PROCTER & GAMBLE`
+e `PROCTER FARMA` separados. Diferente do Botica/Siage/Vult, `PROCTER
+FARMA` (R$42mil em jan/26 sozinho, valor real, não desprezível) **não
+carrega nenhuma das 2 tags de oferta em nenhum mês** (jan-set/26
+conferido) — não participa da promoção, então fica de fora sem precisar
+perguntar ao Gabriel (a própria ausência de tag já responde). As 2
+campanhas (`PROMOÇÃO PROCTER` mensal + `OFERTAS PROCTER SEMANA DO
+CLIENTE`) saem da MESMA consulta agora — `tag_alvo` como lista (mesmo
+mecanismo do Botica) separa automaticamente por `tag_origem` na tela,
+substitui o fluxo antigo de 2 arquivos/2 comandos com
+`escopo_delete='arquivo'`. Validado: apuração da Semana do Cliente
+continua batendo 189 linhas/R$650,00 de investimento (RebaixaProduto),
+idêntico a antes do import do banco.
+
 Backup do painel antes da 1ª gravação: `db.sqlite3.bak-antes-banco`
 (para voltar: fechar o painel e copiar esse arquivo por cima de `db.sqlite3`).
 
 ## Próximos passos
 
-1. **Conferir o painel** (telas Kenvue, Principia e Botica, já gravadas do banco).
+1. **Conferir o painel** (telas Kenvue, Principia, Botica e Procter, já gravadas do banco).
 2. ~~Botica~~ — resolvido, ver nota acima (grupo Botica+Siage+Vult, gravado).
-3. **Procter**: 2 campanhas no mesmo fabricante (mensal
-   `PROMOÇÃO PROCTER` + `OFERTAS PROCTER SEMANA DO CLIENTE`), hoje
-   importadas de arquivos separados com `escopo_delete='arquivo'`.
-   Precisa tratamento próprio (1 consulta, 2 tags).
+3. ~~Procter~~ — resolvido, ver nota acima (2 campanhas numa consulta só via
+   `tag_alvo` em lista, `PROCTER FARMA` fica de fora, gravado).
 4. ~~Botão "Atualizar agora"~~ — resolvido (23/09/26): botão no menu
    "Sistema" do painel, `views.atualizar_agora` roda `importar_do_banco
    todas --dias 7` na hora e mostra mensagem de sucesso/erro.
