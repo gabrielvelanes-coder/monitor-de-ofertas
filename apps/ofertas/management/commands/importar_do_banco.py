@@ -26,7 +26,9 @@ from django.db.models import Max, Sum
 
 from apps.lojas.models import Loja
 from apps.ofertas.erp import codigo_loja, tag_sem_prefixo
-from apps.ofertas.erp_banco import consultar_venda_por_item, consultar_venda_por_tag
+from apps.ofertas.erp_banco import (
+    consultar_venda_por_item, consultar_venda_por_produtos, consultar_venda_por_tag,
+)
 from apps.ofertas.importadores import importar_relatorio_fabricante
 from apps.ofertas.management.commands.importar_botica import TAGS_BOTICA
 from apps.ofertas.models import Lancamento
@@ -75,6 +77,21 @@ MECANICAS = {
     'marketing': {
         'tipo': 'tag', 'mecanica': Lancamento.MARKETING, 'fabricante': None,
         'filtro': 'PRODUTOS MARKETING%',
+    },
+    # 3º tipo, só pra Cestões: acha os produtos (Embalagem) que JÁ tiveram
+    # a tag "OFERTAS CESTAO" alguma vez (histórico completo, não só o
+    # período pedido -- senão um import incremental com --dias esqueceria
+    # produto tageado fora da janela) e importa o HISTÓRICO INTEIRO desses
+    # produtos, com ou sem a tag, de qualquer fabricante (docx, seção 5.4 --
+    # mesma regra do importador antigo, "lista de produtos recalculada a
+    # cada importação, não é fixa"). Achado (23/09/26): "CESTAO" com "%"
+    # dos 2 lados também pegava "CESTAO PREÇO UNICO LOJA NN" -- caderno de
+    # OUTRO projeto do Grupo Velanes (Cestão Preço Único, ferramenta
+    # separada, nada a ver com esta mecânica), inflava de 24 pra 1.843
+    # produtos. Sem "%" = ILIKE exato -- só "OFERTAS CESTAO" mesmo.
+    'cestoes': {
+        'tipo': 'produtos_com_tag', 'mecanica': Lancamento.CESTOES, 'fabricante': None,
+        'filtro': 'OFERTAS CESTAO',
     },
 }
 INICIO_PADRAO = date(2026, 1, 1)
@@ -129,13 +146,25 @@ class Command(BaseCommand):
         if cfg['tipo'] == 'fabricante':
             df = consultar_venda_por_item(inicio, fim, filtro)
             tags_alvo = {cfg['tags'].upper()} if isinstance(cfg['tags'], str) else {t.upper() for t in cfg['tags']}
-        else:  # 'tag'
+        elif cfg['tipo'] == 'tag':
             df = consultar_venda_por_tag(inicio, fim, filtro)
             # Todo mundo que a consulta trouxe já bate o padrão da tag --
             # deriva a lista de tags EXATAS achadas (pode variar por mês,
             # ex. "PRODUTOS MARKETING AGOSTO"/"...SETEMBRO") em vez de fixar
             # uma lista, senão um mês novo nunca visto ficaria de fora.
             tags_alvo = {tag_sem_prefixo(t).upper() for t in df['detalhe_desconto'].dropna().unique()}
+        else:  # 'produtos_com_tag' (Cestões)
+            # A descoberta de QUAIS produtos usa sempre o histórico completo
+            # (INICIO_PADRAO-hoje), nunca só a janela [inicio, fim] -- senão
+            # um `--dias 7` esqueceria produto tageado fora da janela e o
+            # próximo import apagaria o histórico dele por engano.
+            candidatos = consultar_venda_por_tag(INICIO_PADRAO, hoje, filtro)
+            produtos = sorted(candidatos['embalagem'].dropna().unique())
+            if not produtos:
+                raise CommandError(f'{nome}: nenhum produto com a tag "{filtro}" encontrado no banco.')
+            tags_alvo = {tag_sem_prefixo(t).upper() for t in candidatos['detalhe_desconto'].dropna().unique()}
+            df = consultar_venda_por_produtos(inicio, fim, produtos)
+            self.stdout.write(f'{nome}: {len(produtos)} produtos com a tag (histórico completo).')
         self.stdout.write(f'{nome}: {len(df)} linhas no banco '
                           f'(fabricantes: {", ".join(sorted(df["fabricante"].dropna().unique())) or "-"}).')
 
