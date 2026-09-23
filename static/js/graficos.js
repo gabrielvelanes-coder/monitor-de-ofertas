@@ -278,6 +278,15 @@
     var elemento = document.getElementById(canvasId);
     if (!elemento) return null;
 
+    // Cores translúcidas (mesma família de Velanes/Ultra Popular, tom mais
+    // claro) pras unidades -- pedido 23/09/26: "separar as unidades
+    // tambem, por bandeira" (antes era 1 série cinza só, agnóstica de
+    // bandeira). Tom mais claro em vez da cor sólida (já usada na Venda)
+    // pra não confundir as 2 pilhas ao olhar rápido pro gráfico.
+    var CORES_BANDEIRA_ITENS = {
+      velanes: 'rgba(239,159,91,.45)', ultra_popular: 'rgba(229,72,77,.45)',
+    };
+
     var datasets = [
       {
         label: maiuscula('Venda Velanes'), stack: 'venda', yAxisID: 'y',
@@ -288,21 +297,59 @@
         data: grafico.venda_ultra_popular, backgroundColor: CORES_BANDEIRA.ultra_popular,
       },
       {
-        label: maiuscula('Itens'), stack: 'itens', yAxisID: 'y1',
-        data: grafico.itens, backgroundColor: '#8b93a1',
+        label: maiuscula('Itens Velanes'), stack: 'itens', yAxisID: 'y1',
+        data: grafico.itens_velanes, backgroundColor: CORES_BANDEIRA_ITENS.velanes,
+      },
+      {
+        label: maiuscula('Itens Ultra Popular'), stack: 'itens', yAxisID: 'y1',
+        data: grafico.itens_ultra_popular, backgroundColor: CORES_BANDEIRA_ITENS.ultra_popular,
       },
     ];
     var seriesInfo = [
       { label: 'Venda Velanes', eixo: 'moeda' },
       { label: 'Venda Ultra Popular', eixo: 'moeda' },
-      { label: 'Itens', eixo: 'unidades' },
+      { label: 'Itens Velanes', eixo: 'unidades' },
+      { label: 'Itens Ultra Popular', eixo: 'unidades' },
     ];
+
+    // Total geral (Velanes + Ultra Popular) escrito em cima de cada pilha
+    // -- venda em R$ acima da pilha de venda, unidades acima da pilha de
+    // itens (pedido 23/09/26: "me mostre o valor geral tanto em vendas
+    // quanto em unidades").
+    var totalVenda = grafico.labels.map(function (_, i) {
+      return (grafico.venda_velanes[i] || 0) + (grafico.venda_ultra_popular[i] || 0);
+    });
+    var totalItens = grafico.labels.map(function (_, i) {
+      return (grafico.itens_velanes[i] || 0) + (grafico.itens_ultra_popular[i] || 0);
+    });
+    var rotuloTotal = {
+      id: 'rotuloTotal',
+      afterDatasetsDraw: function (chart) {
+        var ctx = chart.ctx;
+        ctx.save();
+        ctx.font = '700 11px -apple-system, "Segoe UI", Roboto, sans-serif';
+        ctx.textAlign = 'center';
+        function escrever(datasetIndex, valores, eixo, cor) {
+          var meta = chart.getDatasetMeta(datasetIndex);
+          ctx.fillStyle = cor;
+          valores.forEach(function (valor, i) {
+            var elem = meta.data[i];
+            if (!elem) return;
+            ctx.fillText(formatarEixo(eixo, valor), elem.x, elem.y - 8);
+          });
+        }
+        escrever(1, totalVenda, 'moeda', '#c7cdd6');
+        escrever(3, totalItens, 'unidades', '#c7cdd6');
+        ctx.restore();
+      },
+    };
 
     var chart = new Chart(elemento, {
       type: 'bar',
       data: { labels: grafico.labels.map(maiuscula), datasets: datasets },
       options: {
         responsive: true,
+        layout: { padding: { top: 20 } },
         plugins: {
           legend: { display: true, position: 'bottom' },
           tooltip: { callbacks: { label: callbackTooltip(seriesInfo) } },
@@ -317,6 +364,7 @@
           },
         },
       },
+      plugins: [rotuloTotal],
     });
     chart._seriesInfo = seriesInfo;
     return chart;

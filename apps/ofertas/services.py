@@ -142,6 +142,7 @@ def calcular_leve3(queryset, busca: str = ''):
     por_mes = defaultdict(lambda: {
         'itens': ZERO, 'venda': ZERO, 'investimento': ZERO, 'margem_contabil': ZERO,
         'margem_ajustada': ZERO, '_venda_bandeira': defaultdict(lambda: ZERO),
+        '_itens_bandeira': defaultdict(lambda: ZERO),
     })
     por_loja = defaultdict(lambda: {
         'codigo': '', 'bandeira': '', 'itens': ZERO, 'venda': ZERO,
@@ -174,6 +175,7 @@ def calcular_leve3(queryset, busca: str = ''):
         mes['margem_contabil'] += lucro
         mes['margem_ajustada'] += margem_ajustada
         mes['_venda_bandeira'][linha['loja__bandeira']] += venda
+        mes['_itens_bandeira'][linha['loja__bandeira']] += itens
 
         loja = por_loja[linha['loja_id']]
         loja['codigo'] = linha['loja__codigo']
@@ -204,6 +206,14 @@ def calcular_leve3(queryset, busca: str = ''):
     # cores das bandeiras?" -- só tinha ido pro Semana/Dia).
     for mes in por_mes.values():
         mes.update(_campos_bandeira(mes.pop('_venda_bandeira')))
+        # Unidades também separadas por bandeira no gráfico Mês (pedido
+        # 23/09/26, logo depois da barra empilhada de venda: "separar as
+        # unidades tambem, por bandeira") -- reaproveita o mesmo helper com
+        # outro prefixo, só `bandeira_dominante` (calculado a partir da
+        # venda, acima) não precisa ser recalculado de novo aqui.
+        itens_bandeira = mes.pop('_itens_bandeira')
+        mes['itens_velanes'] = float(itens_bandeira.get('velanes', ZERO))
+        mes['itens_ultra_popular'] = float(itens_bandeira.get('ultra_popular', ZERO))
 
     por_mes_lista = [{'ano_mes': mes, **valores} for mes, valores in sorted(por_mes.items())]
     labels = [item['ano_mes'] for item in por_mes_lista]

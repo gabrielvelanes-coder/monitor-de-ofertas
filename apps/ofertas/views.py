@@ -186,11 +186,15 @@ def leve3(request):
     # Gabriel: "kenvue esta assim [rico, 4 séries] / leve3 eta assim
     # [tudo laranja] ... vamos arrumar isso"). Empilhada, mostra a
     # proporção real de cada bandeira por mês em vez de só "quem ganhou".
+    # Unidades também divididas por bandeira (pedido 23/09/26, mesmo
+    # motivo da venda acima) -- antes era 1 série cinza só ("Itens"),
+    # agnóstica de bandeira.
     grafico = {
         'labels': [m['ano_mes'] for m in dados['por_mes']],
         'venda_velanes': [m['venda_velanes'] for m in dados['por_mes']],
         'venda_ultra_popular': [m['venda_ultra_popular'] for m in dados['por_mes']],
-        'itens': [float(m['itens']) for m in dados['por_mes']],
+        'itens_velanes': [m['itens_velanes'] for m in dados['por_mes']],
+        'itens_ultra_popular': [m['itens_ultra_popular'] for m in dados['por_mes']],
     }
     # Leve3 não tem `grupo` preenchido (só importa a venda que já é a
     # própria oferta, sem contraparte "base" pra comparar) -- todo período

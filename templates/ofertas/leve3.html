@@ -48,7 +48,7 @@
   {% include "ofertas/_abas_periodo.html" with id_periodo="leve3" %}
   <div data-painel="periodo-leve3" data-valor="mes">
     <h3 style="margin-top:0;">Evolução mensal <small style="color:var(--muted); font-weight:400;">— clique num produto embaixo pra ver a série dele</small></h3>
-    <p style="color:var(--muted); font-size:12.5px;">Venda dividida entre Velanes e Ultra Popular — laranja Velanes, vermelho Ultra Popular. Itens em cinza, à parte.</p>
+    <p style="color:var(--muted); font-size:12.5px;">Venda e unidades divididas entre Velanes e Ultra Popular — laranja Velanes, vermelho Ultra Popular (unidades num tom mais claro). Número em cima de cada barra é o total geral (as 2 bandeiras somadas).</p>
     {% if grafico.labels|length <= 1 %}
       <p style="color:var(--muted); font-size:12.5px;">
         Só {{ grafico.labels|length }} mês selecionado — com 1 ponto só, o gráfico de barra quase não
