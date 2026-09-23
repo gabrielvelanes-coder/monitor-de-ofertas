@@ -80,7 +80,8 @@ Como rodar (PowerShell, na pasta `painel-ofertas`, sem precisar ativar o venv):
 | Cestões | ~10% (1 produto novo no banco) — ver nota abaixo | ✅ Sim — 62.187 lançamentos, dados até 22/09 |
 | Leve 3 | ✅ 0,00% em maio/junho/agosto, diferenças pequenas nos meses de borda | ✅ Sim — 4.743 lançamentos, dados até 22/09 |
 | Kimberly | ✅ 0,00% em jan-ago, filtro manual Hipzinha validado (35 linhas/R$2.095,50) | ✅ Sim — 11.691 lançamentos, dados até 22/09 |
-| Supra Corp, Deu a Louca/Ultra Queimão, Sellout | não configuradas ainda | ❌ |
+| Supra Corp | ✅ 0,00% em agosto | ✅ Sim — 998 lançamentos, jan-set/26 (planilha só tinha ago/set) |
+| Deu a Louca/Ultra Queimão, Sellout | não configuradas ainda | ❌ |
 
 **Botica — achado e decisão (23/09/26):** o banco tem 4 fabricantes que batem
 `%BOTICA%`/relacionados: `BOTICA`, `BOTICA LA PIEL`, `SIAGE EUDORA`, `VULT`.
@@ -169,13 +170,25 @@ ano inteiro — nome exato já resolve, sem precisar de lista. Validado: o
 filtro manual bate exato com o backfill de 22/09/26 (35 linhas,
 R$2.095,50); venda total 0,00% em jan-ago. Gravado: 11.691 lançamentos.
 
+**Supra Corp Day — achado e decisão (23/09/26):** 6º tipo, nem
+fabricante nem tag. **Achado real:** "Supra Corp" é o nome comercial de
+TODA a linha de suplementos/vitaminas da `CATARINENSE` no ERP (68
+produtos distintos), mas a mecânica (degustação) só rastreia 5 SKUs
+específicos (whey/creatina) — lista fixa, sem tag nenhuma pra descobrir
+sozinho (diferente do Cestões). `consultar_venda_por_produtos` com os 5
+nomes exatos hardcoded, sem passada de descoberta antes. Validado:
+agosto bate 0,00% exato. O banco traz o ano inteiro (esses produtos
+vendem fora de evento também, sem problema — `JANELAS_SUPRACORP` só
+define janela pros meses com evento, cálculo de impacto é por mês).
+Gravado: 998 lançamentos.
+
 Backup do painel antes da 1ª gravação: `db.sqlite3.bak-antes-banco`
 (para voltar: fechar o painel e copiar esse arquivo por cima de `db.sqlite3`).
 
 ## Próximos passos
 
 1. **Conferir o painel** (telas Kenvue, Principia, Botica, Procter,
-   Marketing, Cestões, Leve 3 e Kimberly, já gravadas do banco).
+   Marketing, Cestões, Leve 3, Kimberly e Supra Corp, já gravadas do banco).
 2. ~~Botica~~ — resolvido, ver nota acima (grupo Botica+Siage+Vult, gravado).
 3. ~~Procter~~ — resolvido, ver nota acima (2 campanhas numa consulta só via
    `tag_alvo` em lista, `PROCTER FARMA` fica de fora, gravado).
@@ -187,6 +200,8 @@ Backup do painel antes da 1ª gravação: `db.sqlite3.bak-antes-banco`
    fabricante pro cadastro, verba resincronizada, gravado).
 3e. ~~Kimberly~~ — resolvido, ver nota acima (tipo `'kimberly'` novo,
    `classificar_grupo` pro filtro manual da Hipzinha, gravado).
+3f. ~~Supra Corp~~ — resolvido, ver nota acima (tipo `'produtos'` novo,
+   lista fixa de 5 SKUs, gravado).
 4. ~~Botão "Atualizar agora"~~ — resolvido (23/09/26): botão no menu
    "Sistema" do painel, `views.atualizar_agora` roda `importar_do_banco
    todas --dias 7` na hora e mostra mensagem de sucesso/erro.
@@ -198,8 +213,8 @@ Backup do painel antes da 1ª gravação: `db.sqlite3.bak-antes-banco`
    pelo modo automático do Claude Code por mudar o sistema — ver instrução
    deixada pro Gabriel rodar com `!` ou pelo Agendador de Tarefas na UI).
    O computador precisa estar ligado no horário.
-6. Demais mecânicas (Supra Corp, Deu a Louca/Ultra Queimão, Sellout), uma
-   a uma, sempre com `--comparar` antes de gravar. Cadernos de
+6. Demais mecânicas (Deu a Louca/Ultra Queimão, Sellout), uma a uma,
+   sempre com `--comparar` antes de gravar. Cadernos de
    oferta, produtos e itens de caderno também estão no banco
    (`cadernooferta`, `itemcadernooferta`,
    `unidadenegocioparticipantecadernooferta`) — dá pra substituir
