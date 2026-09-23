@@ -2,14 +2,6 @@
 {% if apuracao_resumo %}
 <details class="secao" id="apuracao-industria" open>
   <summary>Apuração para a indústria</summary>
-  <p style="color:var(--muted); font-size:12.5px; margin-top:-4px; margin-bottom:12px;">
-    {% if coluna_titulo == 'Campanha' %}
-      Só aparece pra campanha que já tem a tabela de rebaixa cadastrada.
-    {% else %}
-      1 arquivo por fabricante genérico.
-    {% endif %}
-    Investimento já calculado — sem precisar abrir o Excel pra somar.
-  </p>
   <table class="tabela-interativa">
     <thead>
       <tr><th>{{ coluna_titulo }}</th><th>Período</th><th>Linhas</th><th>Investimento</th><th></th></tr>
