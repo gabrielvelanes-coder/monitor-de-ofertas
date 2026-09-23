@@ -168,20 +168,15 @@ MECANICAS = {
     # isso na prática), mas os padrões abaixo já vêm mais estreitos
     # (`%QUEIM_O%`, não `%QUEIM%`) por segurança extra.
     #
-    # BLOQUEADO PRA GRAVAÇÃO (23/09/26) -- `--comparar` mostra "oferta"
-    # batendo 0,00% exato (a identificação da tag está certa), mas "base"
-    # fica 5-12x maior que a planilha antiga em todo mês. Investigado: os
-    # arquivos que o Gabriel mandou pra jun-ago (`deu a louca ano - com
-    # loja.xls`) vieram JÁ FILTRADOS só com as linhas de oferta (grupo=base
-    # nunca existiu nesses 3 meses -- documentado em 17/09/26); o único mês
-    # com base real (set/26, arquivo "detalhe") tem só 105 produtos, MENOS
-    # que os 194 que a tag já revelou -- ou seja, nem "produtos que já
-    # tiveram a tag" bate com o que ele historicamente comparou. O
-    # `importar_promocao_bandeira` original documenta "base = todo o resto
-    # do portfólio da bandeira", mas isso nunca foi exportado de verdade
-    # (puxar o catálogo INTEIRO de 1 bandeira seria centenas de milhares de
-    # linhas/mês). Não dá pra saber com os dados que tenho qual é o recorte
-    # de "base" que faz sentido pro Gabriel -- perguntar antes de gravar.
+    # Achado + correção (23/09/26): 1ª tentativa descobria os produtos 1 vez
+    # só pro ANO INTEIRO (194 produtos), dando "base" 5-12x maior que a
+    # planilha antiga. Gabriel explicou: é sempre o MESMO caderno de oferta,
+    # só os ITENS dentro dele mudam mês a mês (o que esteve em promoção em
+    # junho não é o mesmo produto de julho/agosto/setembro) -- por isso a
+    # descoberta de produtos roda MÊS A MÊS agora (`_meses_entre`), não 1
+    # lista pro ano todo. "Oferta" sempre bateu 0,00% exato (a
+    # classificação por tag já usava a `itemvenda.cadernoofertaid`
+    # histórica de cada venda, não a composição atual do caderno).
     'deu_a_louca': {
         'tipo': 'promocao_bandeira', 'mecanica': Lancamento.DEU_A_LOUCA,
         'fabricante': None, 'bandeira': Loja.VELANES,
@@ -226,6 +221,17 @@ HIPZINHA_PRODUTO = 'HIPZINHA'
 HIPZINHA_VENDA_MAX = 60
 HIPZINHA_INICIO = date(2026, 7, 27)
 HIPZINHA_FIM = date(2026, 8, 2)
+
+
+def _meses_entre(inicio: date, fim: date):
+    """Gera (mes_inicio, mes_fim) cobrindo [inicio, fim) em pedaços de 1 mês
+    -- pra Deu a Louca/Ultra Queimão, cuja descoberta de produtos precisa
+    rodar mês a mês (ver comentário em `_processar`)."""
+    atual = date(inicio.year, inicio.month, 1)
+    while atual < fim:
+        proximo = date(atual.year + 1, 1, 1) if atual.month == 12 else date(atual.year, atual.month + 1, 1)
+        yield max(atual, inicio), min(proximo, fim)
+        atual = proximo
 
 
 def _classificar_hipzinha(linha) -> str:
@@ -325,23 +331,29 @@ class Command(BaseCommand):
             df = consultar_venda_por_produtos(inicio, fim, filtro)
             tags_alvo = set()
         else:  # 'promocao_bandeira' (Deu a Louca/Ultra Queimão)
-            # Descoberta com >1 padrão (histórico já usou nomes de caderno
-            # diferentes) -- sempre no histórico completo, mesmo motivo do
-            # Cestões. Depois restringe a 1 bandeira via código de loja.
-            candidatos = pd.concat(
-                [consultar_venda_por_tag(INICIO_PADRAO, hoje, padrao) for padrao in filtro],
-                ignore_index=True,
-            )
-            produtos = sorted(candidatos['embalagem'].dropna().unique())
-            if not produtos:
-                raise CommandError(f'{nome}: nenhum produto com a tag encontrado no banco.')
-            tags_alvo = {tag_sem_prefixo(t).upper() for t in candidatos['detalhe_desconto'].dropna().unique()}
+            # Confirmado com o Gabriel (23/09/26): é sempre o MESMO caderno
+            # de oferta -- só os ITENS dentro dele mudam mês a mês (o que
+            # esteve em promoção em junho não é o mesmo de julho/agosto).
+            # Por isso a descoberta de produtos precisa ser MÊS A MÊS, não
+            # 1 lista só pro ano inteiro (isso inflava a "base" 5-12x,
+            # misturando produto de um mês na comparação de outro).
             codigos_loja = Loja.objects.filter(bandeira=cfg['bandeira']).values_list('codigo', flat=True)
-            df = consultar_venda_por_produtos_e_lojas(inicio, fim, produtos, codigos_loja)
-            self.stdout.write(
-                f'{nome}: {len(produtos)} produtos com a tag (histórico completo), '
-                f'restrito a {len(codigos_loja)} lojas ({cfg["bandeira"]}).'
-            )
+            partes = []
+            tags_alvo = set()
+            for mes_ini, mes_fim in _meses_entre(inicio, fim):
+                candidatos = pd.concat(
+                    [consultar_venda_por_tag(mes_ini, mes_fim, padrao) for padrao in filtro],
+                    ignore_index=True,
+                )
+                produtos_mes = sorted(candidatos['embalagem'].dropna().unique())
+                if not produtos_mes:
+                    continue
+                tags_alvo |= {tag_sem_prefixo(t).upper() for t in candidatos['detalhe_desconto'].dropna().unique()}
+                partes.append(consultar_venda_por_produtos_e_lojas(mes_ini, mes_fim, produtos_mes, codigos_loja))
+                self.stdout.write(f'{nome}: {mes_ini:%Y-%m} -- {len(produtos_mes)} produtos com a tag.')
+            if not partes:
+                raise CommandError(f'{nome}: nenhum produto com a tag encontrado no banco.')
+            df = pd.concat(partes, ignore_index=True)
         self.stdout.write(f'{nome}: {len(df)} linhas no banco '
                           f'(fabricantes: {", ".join(sorted(df["fabricante"].dropna().unique())) or "-"}).')
 
