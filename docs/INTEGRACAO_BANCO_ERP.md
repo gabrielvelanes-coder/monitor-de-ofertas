@@ -82,7 +82,9 @@ Como rodar (PowerShell, na pasta `painel-ofertas`, sem precisar ativar o venv):
 | Kimberly | ✅ 0,00% em jan-ago, filtro manual Hipzinha validado (35 linhas/R$2.095,50) | ✅ Sim — 11.691 lançamentos, dados até 22/09 |
 | Supra Corp | ✅ 0,00% em agosto | ✅ Sim — 998 lançamentos, jan-set/26 (planilha só tinha ago/set) |
 | Sellout (EMS/Eurofarma/Germed/Prati) | Germed/Prati 0,00%; EMS/Eurofarma maiores no banco (planilha truncada, ver nota) | ✅ Sim — 69.019+65.451+32.293+61.169 lançamentos, dados até 22/09 |
-| Deu a Louca/Ultra Queimão | ⚠️ oferta 0,00%, base 5-12x maior — **BLOQUEADO**, ver nota abaixo | ❌ Não (aguardando o Gabriel) |
+| Deu a Louca/Ultra Queimão | ✅ oferta 0,00%; set/26 (único mês com base real) caiu de 43-47% pra 7-8% — ver nota abaixo | ✅ Sim — 17.446+5.667 lançamentos, dados até 22/09 |
+
+**Todas as 9 ações + Sellout no banco.**
 
 **Botica — achado e decisão (23/09/26):** o banco tem 4 fabricantes que batem
 `%BOTICA%`/relacionados: `BOTICA`, `BOTICA LA PIEL`, `SIAGE EUDORA`, `VULT`.
@@ -199,40 +201,40 @@ planilha antiga batia no teto de 65.536 linhas do Excel, dado truncado;
 o banco corrige isso de graça). Gravado: 69.019 (EMS) + 65.451
 (Eurofarma) + 32.293 (Germed) + 61.169 (Prati) lançamentos.
 
-**Deu a Louca/Ultra Queimão — investigado, BLOQUEADO PRA GRAVAÇÃO
-(23/09/26):** tentativa de tipo `'promocao_bandeira'` (como Cestões, mas
-restrito a 1 bandeira via código de loja — `consultar_venda_por_
-produtos_e_lojas` nova). `--comparar` mostra "oferta" batendo 0,00%
-exato (a identificação da tag está certa — achado à parte, cuidado:
-histórico do ERP tem cadernos "QUEIMA DE ESTOQUE"/"QUEIMÃO INAUGURAÇÃO
-DERMO JAGUAQUARA" de 2024/2025, evento de loja diferente, que bateriam
-num padrão `%QUEIM%` largo demais — confirmado que nenhum tem venda em
-2026, sem risco na prática). Mas "base" fica 5-12x maior que a planilha
-em todo mês. Investigado a fundo: os arquivos que o Gabriel mandou pra
-jun-ago (`deu a louca ano - com loja.xls`) vieram JÁ FILTRADOS só com
-linhas de oferta (100% grupo=oferta nesses 3 meses, achado documentado
-em 17/09/26 — não tinham base nenhuma pra comparar); o único mês com
-base real (set/26, arquivo "detalhe") tem só 105 produtos, MENOS que os
-194 que a própria tag já revela no histórico completo — ou seja, nem
-"produtos que já tiveram a tag" (mesma lógica do Cestões) bate com o
-recorte real que ele historicamente comparou. `importar_promocao_
-bandeira` (código antigo) documenta "base = todo o resto do portfólio
-da bandeira", mas isso nunca foi exportado de verdade — o catálogo
-INTEIRO de 1 bandeira seria centenas de milhares de linhas/mês.
-**Não implementado — falta perguntar ao Gabriel** o que define o recorte
-de "base" que ele quer pra essas 2 mecânicas antes de gravar qualquer
-coisa. Código novo (`consultar_venda_por_produtos_e_lojas`, tipo
-`'promocao_bandeira'` em `importar_do_banco.py`) já existe e funciona
-pra descoberta/comparação, só falta decidir o escopo certo.
+**Deu a Louca/Ultra Queimão — resolvido (23/09/26):** 1ª tentativa
+(tipo `'promocao_bandeira'`, como Cestões mas restrito a 1 bandeira via
+código de loja — `consultar_venda_por_produtos_e_lojas` nova) descobria
+os produtos 1 vez só pro ANO INTEIRO — "oferta" batia 0,00% exato, mas
+"base" ficava 5-12x maior que a planilha em todo mês. **Gabriel
+explicou o motivo:** é sempre o MESMO caderno de oferta, só os ITENS
+dentro dele mudam mês a mês — o que esteve em promoção em junho não é o
+mesmo produto de julho/agosto/setembro. Corrigido: a descoberta de
+produtos roda MÊS A MÊS agora (`_meses_entre`, novo helper em
+`importar_do_banco.py`), cada mês só usa os produtos que apareceram
+NAQUELE mês (52 em junho, 67 em julho, 96 em agosto, 89 em setembro —
+bem diferente de 1 lista fixa). "Oferta" continuou 0,00% exato (já vinha
+de `itemvenda.cadernoofertaid`, histórico por venda, nunca dependeu da
+composição atual do caderno). Validado: setembro (único mês com base
+real na planilha antiga) caiu de +43-47% pra só +7-8% de diferença —
+jun-ago continuam mostrando "mais" venda que a planilha porque ela nunca
+teve base nesses 3 meses (100% grupo=oferta, achado documentado em
+17/09/26) — não é regressão, é dado novo que passamos a ter. **Achado à
+parte, cuidado:** o histórico do ERP tem cadernos "QUEIMA DE ESTOQUE"/
+"QUEIMÃO INAUGURAÇÃO DERMO JAGUAQUARA" de 2024/2025 (evento de
+inauguração de loja, nada a ver) que bateriam num padrão `%QUEIM%` largo
+demais — confirmado que nenhum tem venda em 2026, sem risco na prática;
+os padrões usados (`%QUEIM_O%`) já vêm mais estreitos por segurança
+extra. Gravado: 17.446 (Deu a Louca) + 5.667 (Ultra Queimão)
+lançamentos.
 
 Backup do painel antes da 1ª gravação: `db.sqlite3.bak-antes-banco`
 (para voltar: fechar o painel e copiar esse arquivo por cima de `db.sqlite3`).
 
 ## Próximos passos
 
-1. **Conferir o painel** (telas Kenvue, Principia, Botica, Procter,
-   Marketing, Cestões, Leve 3, Kimberly, Supra Corp e Sellout, já
-   gravadas do banco).
+1. **Conferir o painel** (todas as 9 ações + Sellout já gravadas do
+   banco: Kenvue, Principia, Botica, Procter, Marketing, Cestões, Leve 3,
+   Kimberly, Supra Corp, Deu a Louca, Ultra Queimão e Sellout).
 2. ~~Botica~~ — resolvido, ver nota acima (grupo Botica+Siage+Vult, gravado).
 3. ~~Procter~~ — resolvido, ver nota acima (2 campanhas numa consulta só via
    `tag_alvo` em lista, `PROCTER FARMA` fica de fora, gravado).
@@ -249,31 +251,23 @@ Backup do painel antes da 1ª gravação: `db.sqlite3.bak-antes-banco`
 3g. ~~Sellout~~ — resolvido, ver nota acima (tipo `'fabricante'` sem
    oferta/base, `escopo_delete='mecanica_fabricante'` novo, 4 fabricantes
    gravados, EMS/Eurofarma corrigem o truncamento do Excel antigo).
-3h. **Deu a Louca/Ultra Queimão — BLOQUEADO, ver nota acima.** Pergunta
-   pro Gabriel: o que define quais produtos/lojas entram na comparação
-   "base" dessas 2 mecânicas? (a) todo o catálogo da bandeira (centenas
-   de milhares de linhas/mês — viável só via banco, nunca foi exportado
-   assim); (b) só os ~200 produtos que já apareceram na tag alguma vez
-   (testado, dá 5-12x mais venda que a planilha); (c) outro recorte
-   específico que ele aplica na hora de exportar do ERP (categoria,
-   departamento?) que não dá pra inferir só pelos dados.
+3h. ~~Deu a Louca/Ultra Queimão~~ — resolvido, ver nota acima (descoberta
+   de produtos mês a mês, `_meses_entre` novo, gravado).
 4. ~~Botão "Atualizar agora"~~ — resolvido (23/09/26): botão no menu
    "Sistema" do painel, `views.atualizar_agora` roda `importar_do_banco
-   todas --dias 7` na hora e mostra mensagem de sucesso/erro.
-5. **Atualização automática 1x por dia** (decidido com o Gabriel: todo
-   dia de manhã, 6h) via Agendador de Tarefas do Windows —
-   `atualizar_diario.bat` (raiz do projeto) já criado e testado, roda
-   `importar_do_banco todas --dias 7` e loga em `atualizacao_diaria.log`.
-   **Falta só registrar a tarefa** (`Register-ScheduledTask` foi bloqueado
-   pelo modo automático do Claude Code por mudar o sistema — ver instrução
-   deixada pro Gabriel rodar com `!` ou pelo Agendador de Tarefas na UI).
-   O computador precisa estar ligado no horário.
-6. **Todas as 9 ações + Sellout já passaram pelo banco** (8 gravadas, 1
-   bloqueada aguardando o Gabriel — item 3h). Cadernos de oferta,
+   todas --dias 7` na hora e mostra mensagem de sucesso/erro. Testado
+   com as 15 mecânicas/fabricantes já liberados: ~16s pro incremental
+   inteiro.
+5. ~~Atualização automática 1x por dia~~ — resolvido (23/09/26): Tarefa
+   Agendada do Windows registrada (`PainelOfertas - Atualizar do ERP`,
+   diária às 6h, roda `atualizar_diario.bat` → `importar_do_banco todas
+   --dias 7`, loga em `atualizacao_diaria.log`). O computador precisa
+   estar ligado no horário.
+6. **Todas as 9 ações + Sellout no banco.** Cadernos de oferta,
    produtos e itens de caderno também estão no banco
    (`cadernooferta`, `itemcadernooferta`,
    `unidadenegocioparticipantecadernooferta`) — dá pra substituir
-   planilhas de cadastro no futuro.
+   planilhas de cadastro no futuro, se precisar.
 7. **Nota pra depois (não pedida ainda):** Marketing, Cestões e Leve 3
    nunca tiveram dado diário (`data`) antes do banco (só `ano_mes`) — agora
    têm, já que a consulta do banco sempre traz `data` por linha. As telas
