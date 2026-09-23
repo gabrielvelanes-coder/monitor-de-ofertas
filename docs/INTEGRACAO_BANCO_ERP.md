@@ -78,7 +78,8 @@ Como rodar (PowerShell, na pasta `painel-ofertas`, sem precisar ativar o venv):
 | Procter | ✅ 0,00% em todos os meses (R$ 1.726.074,65), oferta 0,00% | ✅ Sim — 60.647 lançamentos, dados até 22/09 |
 | Marketing | ✅ 0,00% em agosto (único mês que a planilha tinha) | ✅ Sim — 80.494 lançamentos, jan-set/26 inteiro (planilha só tinha agosto) |
 | Cestões | ~10% (1 produto novo no banco) — ver nota abaixo | ✅ Sim — 62.187 lançamentos, dados até 22/09 |
-| Leve 3, Kimberly, Supra Corp, Deu a Louca/Ultra Queimão, Sellout | não configuradas ainda | ❌ |
+| Leve 3 | ✅ 0,00% em maio/junho/agosto, diferenças pequenas nos meses de borda | ✅ Sim — 4.743 lançamentos, dados até 22/09 |
+| Kimberly, Supra Corp, Deu a Louca/Ultra Queimão, Sellout | não configuradas ainda | ❌ |
 
 **Botica — achado e decisão (23/09/26):** o banco tem 4 fabricantes que batem
 `%BOTICA%`/relacionados: `BOTICA`, `BOTICA LA PIEL`, `SIAGE EUDORA`, `VULT`.
@@ -139,13 +140,28 @@ planilha, explica a diferença de ~10% no histórico (o produto novo soma
 em TODOS os meses porque a mecânica sempre traz o histórico inteiro de
 quem está em cestão hoje). Gravado: 62.187 lançamentos.
 
+**Leve 3 — achado e decisão (23/09/26):** 4º tipo de mecânica, parecido
+com o `'tag'` do Marketing (filtra pelo padrão do caderno de oferta,
+"LEVE 3", só 2 variações no banco — sem risco de decoy tipo Cestões).
+**Achado real:** o fabricante que o banco traz (razão social, ex. "EMS
+GENERICO S/A") não serve — o resto do painel (Sellout, `calcular_
+impacto_leve3_fabricante`) espera o rótulo curto do cadastro
+`apps.produtos` ("EMS"). `importar_do_banco` remapeia a coluna
+`fabricante` do df via `mapa_fabricantes()` (com a heurística antiga
+como fallback) antes de importar. `sincronizar_verba_leve3()` chamado no
+fim, igual o importador antigo fazia. Validado: 0,00% em maio/junho/
+agosto, diferenças pequenas nos meses de borda (jul +0,28%, set -3,54%,
+explicado pelo corte do `--comparar`). Testado ao vivo: tela, seção de
+apuração e download por fabricante funcionando. Gravado: 4.743
+lançamentos, verba resincronizada em 5 meses.
+
 Backup do painel antes da 1ª gravação: `db.sqlite3.bak-antes-banco`
 (para voltar: fechar o painel e copiar esse arquivo por cima de `db.sqlite3`).
 
 ## Próximos passos
 
 1. **Conferir o painel** (telas Kenvue, Principia, Botica, Procter,
-   Marketing e Cestões, já gravadas do banco).
+   Marketing, Cestões e Leve 3, já gravadas do banco).
 2. ~~Botica~~ — resolvido, ver nota acima (grupo Botica+Siage+Vult, gravado).
 3. ~~Procter~~ — resolvido, ver nota acima (2 campanhas numa consulta só via
    `tag_alvo` em lista, `PROCTER FARMA` fica de fora, gravado).
@@ -153,6 +169,8 @@ Backup do painel antes da 1ª gravação: `db.sqlite3.bak-antes-banco`
    `fabricante=None`, jan-set/26 inteiro gravado).
 3c. ~~Cestões~~ — resolvido, ver nota acima (tipo `'produtos_com_tag'`
    novo, achou 1 produto novo, gravado).
+3d. ~~Leve 3~~ — resolvido, ver nota acima (tipo `'leve3'` novo, remapeia
+   fabricante pro cadastro, verba resincronizada, gravado).
 4. ~~Botão "Atualizar agora"~~ — resolvido (23/09/26): botão no menu
    "Sistema" do painel, `views.atualizar_agora` roda `importar_do_banco
    todas --dias 7` na hora e mostra mensagem de sucesso/erro.
@@ -164,18 +182,19 @@ Backup do painel antes da 1ª gravação: `db.sqlite3.bak-antes-banco`
    pelo modo automático do Claude Code por mudar o sistema — ver instrução
    deixada pro Gabriel rodar com `!` ou pelo Agendador de Tarefas na UI).
    O computador precisa estar ligado no horário.
-6. Demais mecânicas (Leve 3, Kimberly, Supra Corp, Deu a Louca/Ultra
-   Queimão, Sellout), uma a uma, sempre com `--comparar` antes de gravar.
-   Leve 3/Kimberly têm regra própria (Leve3: `grupo` nunca é 'oferta' de
-   verdade, todo lançamento já é da promoção; Kimberly: filtro manual sem
-   tag limpa) — vai precisar investigar cada uma antes de encaixar num dos
-   3 tipos já existentes ou criar um 4º. Cadernos de oferta, produtos e
-   itens de caderno também estão no banco (`cadernooferta`,
-   `itemcadernooferta`, `unidadenegocioparticipantecadernooferta`) — dá
-   pra substituir planilhas de cadastro no futuro.
-7. **Nota pra depois (não pedida ainda):** Marketing e Cestões nunca
-   tiveram dado diário (`data`) antes do banco, só `ano_mes` — agora têm,
-   já que a consulta do banco sempre traz `data` por linha. As telas
+6. Demais mecânicas (Kimberly, Supra Corp, Deu a Louca/Ultra Queimão,
+   Sellout), uma a uma, sempre com `--comparar` antes de gravar. Kimberly
+   tem filtro MANUAL sem tag limpa pra Hipzinha (produto/venda_max/janela
+   de data, não uma tag do ERP) — vai precisar investigar antes de
+   encaixar num dos 4 tipos já existentes ou criar um 5º. Cadernos de
+   oferta, produtos e itens de caderno também estão no banco
+   (`cadernooferta`, `itemcadernooferta`,
+   `unidadenegocioparticipantecadernooferta`) — dá pra substituir
+   planilhas de cadastro no futuro.
+7. **Nota pra depois (não pedida ainda):** Marketing, Cestões e Leve 3
+   nunca tiveram dado diário (`data`) antes do banco (só `ano_mes`) — agora
+   têm, já que a consulta do banco sempre traz `data` por linha. As telas
    `marketing.html`/`cestoes.html` ainda não têm as abas Mês/Semana/Dia
-   (`_abas_periodo.html`) que as outras 6 ganharam em 22/09 — dá pra
-   ligar se o Gabriel quiser, é trabalho de UI, não de dado.
+   (`_abas_periodo.html`) que as outras já têm — dá pra ligar se o Gabriel
+   quiser, é trabalho de UI, não de dado (Leve3 já tinha as abas desde
+   22/09, usando o arquivo bruto por dia que ele mandou à parte).
