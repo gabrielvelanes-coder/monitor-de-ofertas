@@ -104,6 +104,22 @@ def conectar():
     )
 
 
+def _executar_consulta(inicio: date, fim: date, filtro_sql: str, **parametros) -> pd.DataFrame:
+    """Roda `CONSULTA_VENDA_POR_ITEM` com `{filtro_fabricante}` substituído
+    por `filtro_sql` (fragmento SQL cru) e `parametros` como parâmetros
+    nomeados extras do `WHERE` (além de `inicio`/`fim`, sempre presentes)."""
+    consulta = CONSULTA_VENDA_POR_ITEM.format(filtro_fabricante=filtro_sql)
+    with conectar() as conn, conn.cursor() as cur:
+        cur.execute(consulta, {'inicio': inicio, 'fim': fim, **parametros})
+        colunas = [d.name for d in cur.description]
+        df = pd.DataFrame(cur.fetchall(), columns=colunas)
+    for col in ('itens', 'venda', 'desconto', 'custo'):
+        df[col] = pd.to_numeric(df[col]).astype(float)
+    df['lucro'] = df['venda'] - df['custo']
+    df['data'] = pd.to_datetime(df['data'])
+    return df
+
+
 def consultar_venda_por_item(inicio: date, fim: date, fabricante_like: str | list[str]) -> pd.DataFrame:
     """Equivalente ao .xls "Análise de Venda por Item" filtrado por
     fabricante, de `inicio` (inclusive) a `fim` (exclusive).
@@ -114,21 +130,21 @@ def consultar_venda_por_item(inicio: date, fim: date, fabricante_like: str | lis
     -- confirmado com o Gabriel 23/09/26; exclui de propósito 'BOTICA LA
     PIEL', que é outro fabricante, não faz parte do grupo)."""
     if isinstance(fabricante_like, str):
-        filtro_fabricante = 'pf.nome ILIKE %(fabricante)s'
-        parametro_fabricante = fabricante_like
-    else:
-        filtro_fabricante = 'pf.nome = ANY(%(fabricante)s)'
-        parametro_fabricante = list(fabricante_like)
+        return _executar_consulta(inicio, fim, 'pf.nome ILIKE %(fabricante)s', fabricante=fabricante_like)
+    return _executar_consulta(inicio, fim, 'pf.nome = ANY(%(fabricante)s)', fabricante=list(fabricante_like))
 
-    consulta = CONSULTA_VENDA_POR_ITEM.format(filtro_fabricante=filtro_fabricante)
-    with conectar() as conn, conn.cursor() as cur:
-        cur.execute(consulta, {
-            'inicio': inicio, 'fim': fim, 'fabricante': parametro_fabricante,
-        })
-        colunas = [d.name for d in cur.description]
-        df = pd.DataFrame(cur.fetchall(), columns=colunas)
-    for col in ('itens', 'venda', 'desconto', 'custo'):
-        df[col] = pd.to_numeric(df[col]).astype(float)
-    df['lucro'] = df['venda'] - df['custo']
-    df['data'] = pd.to_datetime(df['data'])
-    return df
+
+def consultar_venda_por_tag(inicio: date, fim: date, padrao_tag: str) -> pd.DataFrame:
+    """Todas as vendas (qualquer fabricante) cujo caderno de oferta bate o
+    padrão ILIKE `padrao_tag` (ex. 'PRODUTOS MARKETING%'). Pra mecânicas
+    tipo "Itens do Marketing" que não são de 1 fabricante só."""
+    return _executar_consulta(inicio, fim, 'co.nome ILIKE %(tag)s', tag=padrao_tag)
+
+
+def consultar_venda_por_produtos(inicio: date, fim: date, produtos) -> pd.DataFrame:
+    """Todas as vendas (qualquer fabricante, qualquer tag) dos produtos com
+    descrição EXATA em `produtos` (a coluna 'Embalagem'). Pra Cestões: 1ª
+    passada acha os produtos que já tiveram a tag "OFERTAS CESTAO" (via
+    `consultar_venda_por_tag`), 2ª passada traz o histórico COMPLETO
+    desses produtos, dentro ou fora da tag (docx, seção 5.4)."""
+    return _executar_consulta(inicio, fim, 'e.descricao = ANY(%(produtos)s)', produtos=list(produtos))

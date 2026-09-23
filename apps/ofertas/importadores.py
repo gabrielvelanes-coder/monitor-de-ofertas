@@ -24,7 +24,7 @@ from .models import Lancamento
 
 
 def importar_relatorio_fabricante(
-    caminho, mecanica: str, tag_alvo: str | list[str], fabricante: str, escopo_delete: str = 'mecanica',
+    caminho, mecanica: str, tag_alvo: str | list[str], fabricante: str | None, escopo_delete: str = 'mecanica',
     df=None, origem: str | None = None, desde=None,
 ) -> dict:
     """`escopo_delete='mecanica'` (padrão, Kenvue/Principia/Botica): cada
@@ -40,6 +40,11 @@ def importar_relatorio_fabricante(
     ("OFERTA BOTICA NACIONAL"/"OFERTAS BOTICA"/"OFERTAS BOTICA KIT AG",
     confirmado 22/09/26: a "Nacional" só tinha mecânica de PAGAMENTO/verba
     diferente por trás, mas as 3 são oferta de verdade pro painel).
+
+    `fabricante`: 1 rótulo fixo pras 4 mecânicas de "impacto por
+    fabricante" (todo lançamento é do mesmo fabricante) -- OU `None` pra
+    mecânicas tipo "Itens do Marketing", que não são de 1 fabricante só:
+    usa a coluna 'Fabricante' do próprio df, linha a linha (23/09/26).
 
     Leitura direta do banco (23/09/26, `importar_do_banco`): em vez do .xls,
     recebe `df` já no formato de `ler_relatorio_erp` (ver
@@ -58,6 +63,7 @@ def importar_relatorio_fabricante(
     col_data = coluna(df, 'Data')
     col_produto = coluna(df, 'Embalagem')
     col_tag = coluna(df, 'Detalhe Desconto', 'Cad. Oferta')
+    col_fabricante = None if fabricante is not None else coluna(df, 'Fabricante')
     col_itens = coluna(df, 'Itens')
     col_venda = coluna(df, 'Venda')
     col_desconto = coluna(df, 'Desconto')
@@ -112,7 +118,7 @@ def importar_relatorio_fabricante(
             mecanica=mecanica,
             loja=loja,
             produto_descricao=str(linha[col_produto]).strip(),
-            fabricante=fabricante,
+            fabricante=fabricante if fabricante is not None else str(linha.get(col_fabricante, '') or '').strip(),
             tag_origem=tag_bruta,
             grupo=grupo,
             ano_mes=ano_mes,
