@@ -79,7 +79,8 @@ Como rodar (PowerShell, na pasta `painel-ofertas`, sem precisar ativar o venv):
 | Marketing | ✅ 0,00% em agosto (único mês que a planilha tinha) | ✅ Sim — 80.494 lançamentos, jan-set/26 inteiro (planilha só tinha agosto) |
 | Cestões | ~10% (1 produto novo no banco) — ver nota abaixo | ✅ Sim — 62.187 lançamentos, dados até 22/09 |
 | Leve 3 | ✅ 0,00% em maio/junho/agosto, diferenças pequenas nos meses de borda | ✅ Sim — 4.743 lançamentos, dados até 22/09 |
-| Kimberly, Supra Corp, Deu a Louca/Ultra Queimão, Sellout | não configuradas ainda | ❌ |
+| Kimberly | ✅ 0,00% em jan-ago, filtro manual Hipzinha validado (35 linhas/R$2.095,50) | ✅ Sim — 11.691 lançamentos, dados até 22/09 |
+| Supra Corp, Deu a Louca/Ultra Queimão, Sellout | não configuradas ainda | ❌ |
 
 **Botica — achado e decisão (23/09/26):** o banco tem 4 fabricantes que batem
 `%BOTICA%`/relacionados: `BOTICA`, `BOTICA LA PIEL`, `SIAGE EUDORA`, `VULT`.
@@ -155,13 +156,26 @@ explicado pelo corte do `--comparar`). Testado ao vivo: tela, seção de
 apuração e download por fabricante funcionando. Gravado: 4.743
 lançamentos, verba resincronizada em 5 meses.
 
+**Kimberly — achado e decisão (23/09/26):** 5º tipo, 1 fabricante só
+(como Kenvue/Principia), mas SEM tag limpa de oferta no ERP pra
+"Hipzinha" (achado antigo, não documentado no docx) — "oferta" é um
+filtro manual (produto contém "HIPZINHA", venda da linha ≤ R$60, janela
+27/07-02/08/2026), não uma tag. `importar_relatorio_fabricante` ganhou
+`classificar_grupo` (função opcional `linha -> grupo` que substitui a
+classificação por tag quando passada) — só o Kimberly usa. **Achado
+real:** o banco tem 3 fabricantes candidatos (`KIMBERLY CLARK KENKO`,
+`KLABIN KIMBERLY S/A`, `KLABIN KIMBERLY SA`), mas só o 1º tem venda no
+ano inteiro — nome exato já resolve, sem precisar de lista. Validado: o
+filtro manual bate exato com o backfill de 22/09/26 (35 linhas,
+R$2.095,50); venda total 0,00% em jan-ago. Gravado: 11.691 lançamentos.
+
 Backup do painel antes da 1ª gravação: `db.sqlite3.bak-antes-banco`
 (para voltar: fechar o painel e copiar esse arquivo por cima de `db.sqlite3`).
 
 ## Próximos passos
 
 1. **Conferir o painel** (telas Kenvue, Principia, Botica, Procter,
-   Marketing, Cestões e Leve 3, já gravadas do banco).
+   Marketing, Cestões, Leve 3 e Kimberly, já gravadas do banco).
 2. ~~Botica~~ — resolvido, ver nota acima (grupo Botica+Siage+Vult, gravado).
 3. ~~Procter~~ — resolvido, ver nota acima (2 campanhas numa consulta só via
    `tag_alvo` em lista, `PROCTER FARMA` fica de fora, gravado).
@@ -171,6 +185,8 @@ Backup do painel antes da 1ª gravação: `db.sqlite3.bak-antes-banco`
    novo, achou 1 produto novo, gravado).
 3d. ~~Leve 3~~ — resolvido, ver nota acima (tipo `'leve3'` novo, remapeia
    fabricante pro cadastro, verba resincronizada, gravado).
+3e. ~~Kimberly~~ — resolvido, ver nota acima (tipo `'kimberly'` novo,
+   `classificar_grupo` pro filtro manual da Hipzinha, gravado).
 4. ~~Botão "Atualizar agora"~~ — resolvido (23/09/26): botão no menu
    "Sistema" do painel, `views.atualizar_agora` roda `importar_do_banco
    todas --dias 7` na hora e mostra mensagem de sucesso/erro.
@@ -182,11 +198,8 @@ Backup do painel antes da 1ª gravação: `db.sqlite3.bak-antes-banco`
    pelo modo automático do Claude Code por mudar o sistema — ver instrução
    deixada pro Gabriel rodar com `!` ou pelo Agendador de Tarefas na UI).
    O computador precisa estar ligado no horário.
-6. Demais mecânicas (Kimberly, Supra Corp, Deu a Louca/Ultra Queimão,
-   Sellout), uma a uma, sempre com `--comparar` antes de gravar. Kimberly
-   tem filtro MANUAL sem tag limpa pra Hipzinha (produto/venda_max/janela
-   de data, não uma tag do ERP) — vai precisar investigar antes de
-   encaixar num dos 4 tipos já existentes ou criar um 5º. Cadernos de
+6. Demais mecânicas (Supra Corp, Deu a Louca/Ultra Queimão, Sellout), uma
+   a uma, sempre com `--comparar` antes de gravar. Cadernos de
    oferta, produtos e itens de caderno também estão no banco
    (`cadernooferta`, `itemcadernooferta`,
    `unidadenegocioparticipantecadernooferta`) — dá pra substituir
