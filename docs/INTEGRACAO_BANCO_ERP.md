@@ -77,7 +77,8 @@ Como rodar (PowerShell, na pasta `painel-ofertas`, sem precisar ativar o venv):
 | Botica | Grupo redefinido — ver nota abaixo | ✅ Sim — 20.056 lançamentos, dados até 22/09 |
 | Procter | ✅ 0,00% em todos os meses (R$ 1.726.074,65), oferta 0,00% | ✅ Sim — 60.647 lançamentos, dados até 22/09 |
 | Marketing | ✅ 0,00% em agosto (único mês que a planilha tinha) | ✅ Sim — 80.494 lançamentos, jan-set/26 inteiro (planilha só tinha agosto) |
-| Leve 3, Kimberly, Cestões, Supra Corp, Deu a Louca/Ultra Queimão, Sellout | não configuradas ainda | ❌ |
+| Cestões | ~10% (1 produto novo no banco) — ver nota abaixo | ✅ Sim — 62.187 lançamentos, dados até 22/09 |
+| Leve 3, Kimberly, Supra Corp, Deu a Louca/Ultra Queimão, Sellout | não configuradas ainda | ❌ |
 
 **Botica — achado e decisão (23/09/26):** o banco tem 4 fabricantes que batem
 `%BOTICA%`/relacionados: `BOTICA`, `BOTICA LA PIEL`, `SIAGE EUDORA`, `VULT`.
@@ -121,18 +122,37 @@ banco já tem jan-set/26 inteiro (80.494 linhas) — resolve de graça a
 pendência registrada em 17/09/26 ("Marketing só tem 1 mês, preciso o
 Gabriel mandar mais"), sem precisar pedir nada a ele.
 
+**Cestões — achado e decisão (23/09/26):** 3º tipo de mecânica, nenhum
+fabricante fixo, produto identificado pela tag em vez do fabricante —
+1ª passada acha os produtos (Embalagem) que já tiveram a tag "OFERTAS
+CESTAO" (histórico COMPLETO, não só a janela pedida), 2ª passada traz o
+histórico inteiro desses produtos exatos, com ou sem a tag, qualquer
+fabricante (`consultar_venda_por_produtos`, `importar_do_banco` tipo
+`'produtos_com_tag'`). **Achado real:** filtro com wildcard (`%CESTAO%`)
+também pegava "CESTAO PREÇO UNICO LOJA NN" — caderno de OUTRO projeto do
+Grupo Velanes ("Cestão Preço Único", ferramenta separada, nada a ver com
+esta mecânica), inflava de 24 pra 1.843 produtos e a venda de R$2,4M pra
+R$6,9M. Corrigido pra ILIKE exato ("OFERTAS CESTAO", sem `%`). Validado:
+banco achou 24 produtos vs 23 do painel antigo — 1 a mais (TOALHA UMED
+SUPRABABY 140UNID) que entrou em cestão depois da última exportação da
+planilha, explica a diferença de ~10% no histórico (o produto novo soma
+em TODOS os meses porque a mecânica sempre traz o histórico inteiro de
+quem está em cestão hoje). Gravado: 62.187 lançamentos.
+
 Backup do painel antes da 1ª gravação: `db.sqlite3.bak-antes-banco`
 (para voltar: fechar o painel e copiar esse arquivo por cima de `db.sqlite3`).
 
 ## Próximos passos
 
-1. **Conferir o painel** (telas Kenvue, Principia, Botica, Procter e
-   Marketing, já gravadas do banco).
+1. **Conferir o painel** (telas Kenvue, Principia, Botica, Procter,
+   Marketing e Cestões, já gravadas do banco).
 2. ~~Botica~~ — resolvido, ver nota acima (grupo Botica+Siage+Vult, gravado).
 3. ~~Procter~~ — resolvido, ver nota acima (2 campanhas numa consulta só via
    `tag_alvo` em lista, `PROCTER FARMA` fica de fora, gravado).
 3b. ~~Marketing~~ — resolvido, ver nota acima (tipo `'tag'` novo,
    `fabricante=None`, jan-set/26 inteiro gravado).
+3c. ~~Cestões~~ — resolvido, ver nota acima (tipo `'produtos_com_tag'`
+   novo, achou 1 produto novo, gravado).
 4. ~~Botão "Atualizar agora"~~ — resolvido (23/09/26): botão no menu
    "Sistema" do painel, `views.atualizar_agora` roda `importar_do_banco
    todas --dias 7` na hora e mostra mensagem de sucesso/erro.
@@ -144,12 +164,18 @@ Backup do painel antes da 1ª gravação: `db.sqlite3.bak-antes-banco`
    pelo modo automático do Claude Code por mudar o sistema — ver instrução
    deixada pro Gabriel rodar com `!` ou pelo Agendador de Tarefas na UI).
    O computador precisa estar ligado no horário.
-6. Demais mecânicas (Leve 3, Kimberly, Cestões, Supra Corp, Deu a Louca/
-   Ultra Queimão, Sellout), uma a uma, sempre com `--comparar` antes de
-   gravar. Cestões precisa de um 3º "tipo" de consulta (achar produtos que
-   já tiveram a tag, depois trazer o histórico completo DESSES produtos
-   independente de fabricante/tag — `consultar_venda_por_produtos` já
-   pronta em `erp_banco.py`, falta ligar no `importar_do_banco`). Cadernos de oferta,
-   produtos e itens de caderno também estão no banco
-   (`cadernooferta`, `itemcadernooferta`, `unidadenegocioparticipantecadernooferta`)
-   — dá pra substituir planilhas de cadastro no futuro.
+6. Demais mecânicas (Leve 3, Kimberly, Supra Corp, Deu a Louca/Ultra
+   Queimão, Sellout), uma a uma, sempre com `--comparar` antes de gravar.
+   Leve 3/Kimberly têm regra própria (Leve3: `grupo` nunca é 'oferta' de
+   verdade, todo lançamento já é da promoção; Kimberly: filtro manual sem
+   tag limpa) — vai precisar investigar cada uma antes de encaixar num dos
+   3 tipos já existentes ou criar um 4º. Cadernos de oferta, produtos e
+   itens de caderno também estão no banco (`cadernooferta`,
+   `itemcadernooferta`, `unidadenegocioparticipantecadernooferta`) — dá
+   pra substituir planilhas de cadastro no futuro.
+7. **Nota pra depois (não pedida ainda):** Marketing e Cestões nunca
+   tiveram dado diário (`data`) antes do banco, só `ano_mes` — agora têm,
+   já que a consulta do banco sempre traz `data` por linha. As telas
+   `marketing.html`/`cestoes.html` ainda não têm as abas Mês/Semana/Dia
+   (`_abas_periodo.html`) que as outras 6 ganharam em 22/09 — dá pra
+   ligar se o Gabriel quiser, é trabalho de UI, não de dado.
