@@ -131,6 +131,22 @@ MECANICAS = {
         'tipo': 'kimberly', 'mecanica': Lancamento.KIMBERLY, 'tags': [],
         'fabricante': 'Kimberly Clark', 'filtro': 'KIMBERLY CLARK KENKO',
     },
+    # 6º tipo: nem fabricante nem tag -- "Supra Corp" é o nome comercial de
+    # TODA a linha de suplementos/vitaminas da CATARINENSE no ERP (68
+    # produtos distintos achados ao investigar), mas a mecânica Supra Corp
+    # Day (degustação) só rastreia 5 SKUs específicos (whey/creatina) --
+    # lista fixa, sem tag nenhuma pra descobrir sozinho (diferente do
+    # Cestões). `consultar_venda_por_produtos` com nomes exatos, igual
+    # Cestões faz na 2ª passada, mas sem 1ª passada de descoberta.
+    'supracorp': {
+        'tipo': 'produtos', 'mecanica': Lancamento.SUPRACORP, 'fabricante': 'Supra Corp',
+        'filtro': [
+            'SUPRA CORP CREATINA 150G', 'SUPRA CORP CREATINA 300G',
+            'SUPRA CORP WHEY PROTEIN BAUNILHA 450 G',
+            'SUPRA CORP WHEY PROTEIN CHOCOLATE 450GR',
+            'SUPRA CORP WHEY PROTEIN MORANGO 450 G',
+        ],
+    },
 }
 
 # Filtro manual da promoção Hipzinha (Kimberly) -- ver comentário acima.
@@ -221,7 +237,7 @@ class Command(BaseCommand):
                 df['fabricante'] = df['embalagem'].map(
                     lambda p: mapa_fab.get(p) or fabricante_generico(p)
                 )
-        else:  # 'produtos_com_tag' (Cestões)
+        elif cfg['tipo'] == 'produtos_com_tag':  # Cestões
             # A descoberta de QUAIS produtos usa sempre o histórico completo
             # (INICIO_PADRAO-hoje), nunca só a janela [inicio, fim] -- senão
             # um `--dias 7` esqueceria produto tageado fora da janela e o
@@ -233,6 +249,9 @@ class Command(BaseCommand):
             tags_alvo = {tag_sem_prefixo(t).upper() for t in candidatos['detalhe_desconto'].dropna().unique()}
             df = consultar_venda_por_produtos(inicio, fim, produtos)
             self.stdout.write(f'{nome}: {len(produtos)} produtos com a tag (histórico completo).')
+        else:  # 'produtos' (Supra Corp Day -- lista fixa, sem tag pra descobrir)
+            df = consultar_venda_por_produtos(inicio, fim, filtro)
+            tags_alvo = set()
         self.stdout.write(f'{nome}: {len(df)} linhas no banco '
                           f'(fabricantes: {", ".join(sorted(df["fabricante"].dropna().unique())) or "-"}).')
 
