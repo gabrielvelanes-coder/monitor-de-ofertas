@@ -7,16 +7,27 @@ este projeto) e do app "AÇÕES DE MARKETING - CAMPANHAS".
 
 Mecânicas cobertas: Leve 3 Pague 2 · Degustação Supra Corp Day · Ofertas
 Kenvue · Ofertas Principia · Ofertas Botica · Ofertas Procter · Ofertas
-Kimberly · Cestões · Itens do Marketing — todas com importador, tela,
-menu lateral, dashboard executivo e gráficos (Chart.js local, sem CDN).
-Mais uma referência sem tela própria no menu — Sellout (EMS/Eurofarma/
-Germed/Prati, giro completo do fabricante) — usada só pra medir o
-impacto do Leve 3 sobre o fabricante. Módulo de verba/recebimento
-(`apps/verba`) cobre CMV com/sem verba nas 9 ações, mas só Leve 3 tem
+Kimberly · Cestões · Itens do Marketing · Deu a Louca (Velanes) · Ultra
+Queimão (Ultra Popular) — todas com importador, tela, menu lateral,
+dashboard executivo e gráficos (Chart.js local, sem CDN). Mais uma
+referência sem tela própria no menu — Sellout (EMS/Eurofarma/Germed/
+Prati, giro completo do fabricante) — usada só pra medir o impacto do
+Leve 3 sobre o fabricante. Módulo de verba/recebimento (`apps/verba`)
+cobre CMV com/sem verba nas 9 ações, mas só Leve 3 e Principia têm
 apuração automática validada — ver "Pendências" abaixo.
 
 As regras de negócio (fórmulas, tags de "Cad. Oferta" por mecânica,
 heurística de bandeira) vêm de `../Painel_de_Ofertas_Documentacao.docx`.
+
+**Banco do painel fora da pasta do projeto (23/09/26).** `db.sqlite3`
+vive em `C:\Users\E.C Velanes\painel-ofertas-dados\` (fora do OneDrive
+— o sincronismo em tempo real deixava toda consulta lenta, medido: uma
+consulta de 227 mil linhas caiu de 27,4s pra 1,8s só de mover o
+arquivo). Configurável via variável de ambiente `PAINEL_DB_PATH`
+(`config/settings.py` e `backup_tudo.py` leem a mesma). O código e os
+documentos continuam normalmente na pasta do projeto/OneDrive — só o
+banco "vivo" que mudou de lugar; o backup diário (`backup_tudo.py`)
+continua copiando pro OneDrive do jeito que já estava.
 
 **Correção (12/09/26) — Impacto por Fabricante (Kenvue/Principia/Botica/
 Procter):** a comparação "base vs. oferta" era feita entre a tag literal
@@ -29,12 +40,17 @@ do fabricante; base = todo o resto das vendas dele, "Sem Desconto"
 incluído. Os 4 fabricantes foram reimportados; base agora é sempre maior
 que oferta, em todo mês.
 
-**Leitura direta do banco do ERP (23/09/26, em andamento):** Kenvue e
-Principia já são importadas direto do PostgreSQL do ERP (somente leitura), sem .xls —
-`python manage.py importar_do_banco <mecanica> [--comparar | --dias N]`.
-Ambas validadas (0,00%); Botica com pendência (+0,22%). Mapeamento,
-filtros, status e próximos passos em
-[`docs/INTEGRACAO_BANCO_ERP.md`](docs/INTEGRACAO_BANCO_ERP.md).
+**Leitura direta do banco do ERP (23/09/26) — concluída pras 9 ações +
+Sellout + Vendas Gerais.** Nada mais depende de planilha exportada à
+mão pro dia a dia — `python manage.py importar_do_banco <mecanica>
+[--comparar | --dias N]` (ou `todas`, que o botão "Atualizar agora" e a
+Tarefa Agendada do Windows (diária, 6h) já rodam sozinhos). Todas as
+mecânicas validadas contra a planilha antiga antes de gravar (0,00% ou
+diferença explicada e documentada — 2 achados reais corrigiram o dado:
+Botica ganhou Siage/Vult no grupo, Sellout EMS/Eurofarma corrigiu um
+truncamento de 65.536 linhas do Excel que a planilha antiga tinha).
+Mapeamento, filtros, os "tipos" de mecânica e todo o histórico de
+achados em [`docs/INTEGRACAO_BANCO_ERP.md`](docs/INTEGRACAO_BANCO_ERP.md).
 
 ## Rodando localmente
 
@@ -200,7 +216,59 @@ delas. **Pendência em aberto:** Gabriel perguntou se dá pra levar
 vez de pintar ela inteira — avaliado, não implementado ainda (ver seção
 "Pendências").
 
+## Dashboard de gestão (23/09/26)
+
+Home (`/`) redesenhada em torno do objetivo real do painel — gestão das
+ofertas, não só um placar por ação:
+
+- **Vendas gerais × ofertas ("impacto no todo").** Faturamento do MÊS
+  INTEIRO do Grupo Velanes (todo produto, todas as lojas — não só as 9
+  ações monitoradas) comparado com o faturamento em oferta, com o % que
+  representa. Vem de `VendaGeralMensal` (agregado mês×loja, alimentado
+  por `importar_do_banco vendas_gerais` — também roda dentro de
+  `todas`). Gráfico de evolução mensal comparando os dois sempre mostra
+  o HISTÓRICO COMPLETO (cards seguem o filtro de período escolhido,
+  mesmo padrão já usado nas telas de ação).
+- **Filtro do dashboard:** abre no MÊS VIGENTE por padrão (não mais
+  "todos os meses"); ganhou "De/Até" pra escolher um intervalo de meses
+  em vez de 1 só — só na home, as telas de ação continuam com "todos os
+  meses" por padrão (faz mais sentido lá).
+- **CMV sem/com verba** agregado nos cards do topo, além de já existir
+  por ação na tabela de ranking.
+- **Barra de filtro (Mês/Bandeira/De/Até)** redesenhada — "pills" com
+  rótulo pequeno em cima e valor embaixo, em vez de `<select>` solto.
+  Vale pra toda tela, não só a home.
+- **Tabela de Lojas interativa:** clicar numa loja ou bandeira (nas
+  telas com seção "Lojas" — Leve3, Cestões, os 4 fabricantes, Deu a
+  Louca/Ultra Queimão) destaca a série dela no gráfico, igual já
+  funcionava clicando num produto.
+- **Drill-down com Ctrl+clique:** clique normal na tabela agora
+  SUBSTITUI a seleção (só fica o item clicado); Ctrl/Cmd+clique
+  ACRESCENTA (multi-seleção de verdade). Achado real corrigido junto: a
+  linha do item destacado sempre acabava cruzando por cima das barras
+  no gráfico (a escala oculta do destaque esticava o próprio máximo do
+  item até o topo do canvas, por definição — não dependia do tamanho
+  real do item); corrigido com uma folga de escala (2,5×) recalculada a
+  cada clique.
+- **Admin escondido** do menu lateral (continua acessível direto em
+  `/admin/`, só tirou o link visível).
+
 ## Pendências
+
+**Resumo do que está genuinamente aberto hoje (23/09/26)** — o resto
+desta seção é histórico (decisões e achados já resolvidos, mantidos
+como registro):
+- Fórmula de verba de Botica/Cestões/Itens do Marketing/Kimberly/Supra
+  Corp Day — nenhuma definida ainda (Kenvue tem fórmula decodificada
+  mas bloqueada, ver detalhe abaixo).
+- Kenvue "calcular a quantidade vendida sozinho" — bloqueado, achado
+  real de divergência (~35% a menos que o calendário da indústria) sem
+  explicação ainda.
+- Validação da mecânica Kimberly em si (separado da fórmula de verba).
+- Home/dashboard ainda ~6s de carregamento (Python somando as 9 ações a
+  cada load, não é I/O) — registrado, não priorizado ainda.
+- Marketing/Cestões sem as abas Mês/Semana/Dia (têm dado por dia desde
+  23/09, só falta ligar a UI se o Gabriel quiser).
 
 - **Controle de verba/recebimento + CMV com/sem verba — implementado
   (12/09/26)**, plano em [`docs/PLANO_VERBA.md`](docs/PLANO_VERBA.md).
@@ -221,8 +289,12 @@ vez de pintar ela inteira — avaliado, não implementado ainda (ver seção
   - **Kenvue / Principia / Botica / Procter:** confirmado com o Gabriel
     que **cada indústria tem sua própria regra e formato** (não dá pra
     usar 1 fórmula genérica pras 4, diferente do que se assumiu ao
-    planejar o módulo). **Procter Semana do Cliente — resolvido
-    (21/09/26):** `rebaixas_produtos procter.xlsx` (EAN/Produto/Rebaixa,
+    planejar o módulo). **Principia — resolvido (23/09/26):** "20% sobre
+    o custo do produto" — sem tabela nenhuma, só um percentual fixo
+    sobre o custo das linhas em oferta (`PERCENTUAL_VERBA_FABRICANTE`,
+    `apps/verba/services.py`, `sincronizar_verba_percentual_custo`).
+    **Procter Semana do Cliente — resolvido (21/09/26):**
+    `rebaixas_produtos procter.xlsx` (EAN/Produto/Rebaixa,
     valor fixo em R$ por UNIDADE vendida). Modelo `RebaixaProduto`
     (`apps/produtos`, escopado por mecânica+campanha), `manage.py
     importar_rebaixas`. **Kenvue — fórmula decodificada mas BLOQUEADA
@@ -360,9 +432,11 @@ vez de pintar ela inteira — avaliado, não implementado ainda (ver seção
   `iniciarDrillDown` (ativar e desativar destaque). Testado ao vivo:
   Kenvue e Leve3, linha sobe/desce de verdade agora, desmarcar também
   funciona.
-- Kimberly: importador aceita curadoria manual (`--produto`/
-  `--venda-max`/`--data-inicio`/`--data-fim`), mas a fórmula ainda
-  precisa da validação do Gabriel.
+- Kimberly: filtro manual da Hipzinha (produto/venda máxima/janela de
+  data) migrado pro banco (23/09/26, `classificar_grupo` em
+  `importar_relatorio_fabricante`) e validado batendo exato com o
+  backfill anterior (35 linhas, R$2.095,50) — mas a MECÂNICA em si
+  (separado da questão de verba) ainda precisa da validação do Gabriel.
 - **Fabricante do Leve 3 — resolvido (12/09/26)** com o cadastro que o
   Gabriel mandou (`apps/produtos`, `importar_produtos`). 100% dos 150
   produtos distintos do Leve 3 bateram com o cadastro — zero "não

@@ -1,8 +1,11 @@
-# Integração direta com o banco do ERP (em andamento)
+# Integração direta com o banco do ERP (concluída — 23/09/26)
 
 Objetivo: o painel parar de depender de .xls exportados à mão ("Análise de
-Venda por Item") e buscar os dados direto do banco do ERP. Iniciado em
-23/09/26 com o Gabriel.
+Venda por Item") e buscar os dados direto do banco do ERP. Iniciado e
+concluído em 23/09/26 com o Gabriel — as 9 ações + Sellout + Vendas
+Gerais (faturamento total, usado no dashboard) rodam 100% do banco
+agora. Atualização automática diária (Tarefa Agendada do Windows, 6h)
+e manual (botão "Atualizar agora" no painel).
 
 ## Banco
 
@@ -44,8 +47,14 @@ Consulta completa em `apps/ofertas/erp_banco.py` (`CONSULTA_VENDA_POR_ITEM`).
 
 ## O que foi implementado
 
-- `apps/ofertas/erp_banco.py` (novo): conexão somente leitura +
-  `consultar_venda_por_item(inicio, fim, fabricante_like)`, devolve
+- `apps/ofertas/erp_banco.py` (novo): conexão somente leitura + várias
+  consultas, cada uma pro "tipo" de mecânica certo (ver abaixo):
+  `consultar_venda_por_item` (1+ fabricantes), `consultar_venda_por_tag`
+  (qualquer fabricante, filtra pelo caderno de oferta),
+  `consultar_venda_por_produtos`/`consultar_venda_por_produtos_e_lojas`
+  (lista exata de produtos, com ou sem restrição de loja), e
+  `consultar_venda_geral_mensal` (agregado mês×loja, TODO produto — pro
+  denominador de "vendas gerais" do dashboard). Todas devolvem
   DataFrame com as mesmas colunas normalizadas de `erp.ler_relatorio_erp`.
 - `apps/ofertas/management/commands/importar_do_banco.py` (novo):
   - `importar_do_banco <mecanica> --comparar` — compara banco x painel
@@ -54,11 +63,31 @@ Consulta completa em `apps/ofertas/erp_banco.py` (`CONSULTA_VENDA_POR_ITEM`).
     ontem, substitui os lançamentos da mecânica (`arquivo_origem='banco'`).
   - `importar_do_banco <mecanica> --dias N` — incremental: refaz só os
     últimos N dias (apaga/recria `data >= hoje-N`), mantém o histórico.
-  - `importar_do_banco todas ...` — todas as mecânicas liberadas.
-  - Mecânicas configuradas: `kenvue`, `principia`, `botica`.
+  - `importar_do_banco todas ...` — todas as 9 ações + Sellout (4
+    fabricantes) + `vendas_gerais`, um comando só.
+  - **8 "tipos" de mecânica** (cada config no dict `MECANICAS` diz qual):
+    `fabricante` (1+ fabricantes do ERP — Kenvue/Principia/Botica/
+    Procter), `tag` (qualquer fabricante, filtra pelo caderno de oferta
+    — Marketing), `produtos_com_tag` (acha produtos pela tag, traz
+    histórico completo deles — Cestões), `leve3` (como `tag`, mas
+    remapeia fabricante pro cadastro `apps.produtos`), `kimberly` (1
+    fabricante, mas oferta é filtro MANUAL via `classificar_grupo`,
+    sem tag limpa no ERP), `produtos` (lista fixa, sem tag — Supra Corp
+    Day), `promocao_bandeira` (como `produtos_com_tag`, restrito a 1
+    bandeira, descoberta MÊS A MÊS — Deu a Louca/Ultra Queimão),
+    `escopo_delete='mecanica_fabricante'` (Sellout: 1 mecânica, 4
+    fabricantes coexistindo). `vendas_gerais` é tratado à parte (não é
+    "mecânica" nenhuma, não usa `Lancamento` — grava em
+    `VendaGeralMensal`).
 - `apps/ofertas/importadores.py`: `importar_relatorio_fabricante` aceita
-  `df=`, `origem=` e `desde=` (dados do banco / incremental). O fluxo por
-  .xls continua funcionando igual.
+  `df=`, `origem=`, `desde=` (dados do banco / incremental),
+  `fabricante=None` (usa o fabricante por linha do df, pra mecânica que
+  não é de 1 fabricante só) e `classificar_grupo=` (função opcional que
+  substitui a classificação por tag — só Kimberly usa). O fluxo por
+  .xls continua funcionando igual (nenhum importador antigo foi
+  removido, só deixaram de ser necessários no dia a dia).
+- `apps/ofertas/models.py`: `VendaGeralMensal` (ano_mes × loja,
+  agregado — faturamento do mês inteiro, todo produto, não só oferta).
 - `requirements.txt`: `psycopg[binary]>=3.2`. `.gitignore`: `.env`.
 
 Como rodar (PowerShell, na pasta `painel-ofertas`, sem precisar ativar o venv):
