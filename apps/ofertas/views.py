@@ -194,6 +194,11 @@ def home(request):
     # faturamento do mês/período INTEIRO (todo produto), não só as 9 ações
     # -- denominador pra "que fatia do faturamento é oferta?".
     vendas_gerais = vendas_gerais_resumo(bandeira, mes, mes_de, mes_ate)
+    # CMV das vendas gerais (pedido 23/09/26, "vamos trazer meu CMV atual
+    # também, nas vendas") -- não tem "verba" aqui (verba só existe pras 9
+    # ações monitoradas), só o CMV cheio do faturamento total.
+    vendas_gerais['lucro'] = vendas_gerais['venda'] - vendas_gerais['custo']
+    vendas_gerais['cmv_pct'] = cmv_pct(vendas_gerais['venda'], vendas_gerais['lucro'])
     pct_ofertas_do_total = (
         (resumo['total_venda'] / vendas_gerais['venda'] * 100) if vendas_gerais['venda'] else None
     )

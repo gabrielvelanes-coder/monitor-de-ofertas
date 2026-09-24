@@ -30,7 +30,7 @@
     <div class="card">
       <div class="rotulo">Faturamento total do grupo</div>
       <div class="valor">{{ vendas_gerais.venda|brl }}</div>
-      <div class="sub">{{ vendas_gerais.itens|numero }} itens vendidos</div>
+      <div class="sub">{{ vendas_gerais.itens|numero }} itens vendidos · CMV {{ vendas_gerais.cmv_pct|numero:1 }}%</div>
     </div>
     <div class="card destaque">
       <div class="rotulo">Faturamento em ofertas monitoradas</div>
