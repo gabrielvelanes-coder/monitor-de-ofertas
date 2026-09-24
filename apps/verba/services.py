@@ -82,16 +82,23 @@ def sincronizar_verba_percentual_custo(mecanica: str, ano_mes: str | None = None
     return atualizados
 
 
-def verba_apurada(mecanica: str, ano_mes: str = '') -> Decimal | None:
-    """Soma de `valor_apurado` da mecânica — 1 mês (`ano_mes` preenchido) ou
-    todos os meses com apuração (`ano_mes` vazio, usado quando o dashboard
-    não tem filtro de mês). `None` quando não há nenhuma linha apurada
-    ainda pra essa mecânica (ação sem fórmula de verba definida) — nunca
-    0 silencioso, que pareceria "sem verba a receber" em vez de "pendente
-    de definição"."""
+def verba_apurada(
+    mecanica: str, ano_mes: str = '', ano_mes_de: str = '', ano_mes_ate: str = '',
+) -> Decimal | None:
+    """Soma de `valor_apurado` da mecânica — 1 mês (`ano_mes` preenchido),
+    um intervalo (`ano_mes_de`/`ano_mes_ate`, 23/09/26, dashboard "escolher
+    mais datas") ou todos os meses com apuração (nenhum dos 3 preenchido).
+    `None` quando não há nenhuma linha apurada ainda pra essa mecânica
+    (ação sem fórmula de verba definida) — nunca 0 silencioso, que
+    pareceria "sem verba a receber" em vez de "pendente de definição"."""
     queryset = VerbaMensal.objects.filter(mecanica=mecanica, valor_apurado__isnull=False)
     if ano_mes:
         queryset = queryset.filter(ano_mes=ano_mes)
+    elif ano_mes_de or ano_mes_ate:
+        if ano_mes_de:
+            queryset = queryset.filter(ano_mes__gte=ano_mes_de)
+        if ano_mes_ate:
+            queryset = queryset.filter(ano_mes__lte=ano_mes_ate)
     valores = list(queryset.values_list('valor_apurado', flat=True))
     return sum(valores, ZERO) if valores else None
 

@@ -60,6 +60,8 @@
 </div>
 {{ grafico|json_script:"dados-grafico-leve3" }}
 {{ series_produtos|json_script:"dados-series-produtos-leve3" }}
+{{ series_lojas|json_script:"dados-series-lojas-leve3" }}
+{{ series_bandeiras|json_script:"dados-series-bandeiras-leve3" }}
 
 <details class="secao" open>
   <summary>Lojas</summary>
@@ -67,13 +69,13 @@
     <a href="#" class="ativa" data-grupo="lojas-leve3" data-valor="macro" onclick="alternarPainel(this); return false;">Por bandeira</a>
     <a href="#" data-grupo="lojas-leve3" data-valor="detalhe" onclick="alternarPainel(this); return false;">Loja a loja</a>
   </div>
-  <table data-painel="lojas-leve3" data-valor="macro" class="tabela-interativa">
+  <table id="tabela-bandeiras" data-painel="lojas-leve3" data-valor="macro" class="tabela-interativa">
     <thead>
       <tr><th>Bandeira</th><th>Itens</th><th>Venda</th><th>CMV %</th><th>Lucro</th><th>CMV % com verba</th><th>Investimento</th></tr>
     </thead>
     <tbody>
       {% for b in ranking_bandeiras %}
-        <tr>
+        <tr class="linha-clicavel" data-bandeira="{{ b.bandeira }}">
           <td>{{ b.bandeira }}</td>
           <td>{{ b.itens|numero }}</td>
           <td>{{ b.venda|brl }}</td>
@@ -100,13 +102,13 @@
       </tfoot>
     {% endif %}
   </table>
-  <table data-painel="lojas-leve3" data-valor="detalhe" class="tabela-interativa" hidden>
+  <table id="tabela-lojas" data-painel="lojas-leve3" data-valor="detalhe" class="tabela-interativa" hidden>
     <thead>
       <tr><th>Loja</th><th>Bandeira</th><th>Itens</th><th>Venda</th><th>CMV %</th><th>Lucro</th><th>CMV % com verba</th><th>Investimento</th></tr>
     </thead>
     <tbody>
       {% for l in ranking_lojas %}
-        <tr>
+        <tr class="linha-clicavel" data-loja="{{ l.codigo }}">
           <td>{{ l.codigo }}</td>
           <td>{{ l.bandeira|bandeira_rotulo }}</td>
           <td>{{ l.itens|numero }}</td>
@@ -225,5 +227,13 @@
   if (dadosPeriodoEl) {
     montarAbasGraficoPeriodo('leve3', JSON.parse(dadosPeriodoEl.textContent), { modo: 'bandeira-empilhada', cores: window.CORES_BANDEIRA });
   }
+
+  var seriesLojas = JSON.parse(document.getElementById('dados-series-lojas-leve3').textContent);
+  var destacarLoja = iniciarDrillDown(chart, seriesLojas, 'Venda');
+  ligarSelecaoTabela(document.querySelectorAll('#tabela-lojas .linha-clicavel'), destacarLoja, 'loja');
+
+  var seriesBandeiras = JSON.parse(document.getElementById('dados-series-bandeiras-leve3').textContent);
+  var destacarBandeira = iniciarDrillDown(chart, seriesBandeiras, 'Venda');
+  ligarSelecaoTabela(document.querySelectorAll('#tabela-bandeiras .linha-clicavel'), destacarBandeira, 'bandeira');
 </script>
 {% endblock %}

@@ -640,4 +640,66 @@
       });
     });
   };
+
+  // Dashboard (23/09/26, pedido "impacto no todo"): faturamento TOTAL do
+  // grupo (todo produto) vs. faturamento em ofertas monitoradas, por mês
+  // -- 2 barras lado a lado (não empilhadas, são a MESMA venda contada 2
+  // vezes em escalas diferentes -- oferta é subconjunto do total, não um
+  // complemento dele). % escrito em cima da barra de oferta (fatia que
+  // ela representa do total daquele mês). `grafico` = `{labels, total,
+  // ofertas}` (`services.vendas_gerais_evolucao_mensal` + soma de
+  // `Lancamento` por mês, ver `views.home`).
+  var COR_TOTAL_GERAL = '#7a8aa8';
+  window.graficoVendasGerais = function (canvasId, grafico) {
+    var elemento = document.getElementById(canvasId);
+    if (!elemento || !grafico.labels.length) return null;
+
+    var datasets = [
+      { label: maiuscula('Faturamento total'), data: grafico.total, backgroundColor: COR_TOTAL_GERAL, borderRadius: 4 },
+      { label: maiuscula('Faturamento em oferta'), data: grafico.ofertas, backgroundColor: '#5b8def', borderRadius: 4 },
+    ];
+    var seriesInfo = [
+      { label: 'Faturamento total', eixo: 'moeda' },
+      { label: 'Faturamento em oferta', eixo: 'moeda' },
+    ];
+
+    var rotuloPct = {
+      id: 'rotuloPct',
+      afterDatasetsDraw: function (chart) {
+        var ctx = chart.ctx;
+        var meta = chart.getDatasetMeta(1);
+        ctx.save();
+        ctx.font = '700 11px -apple-system, "Segoe UI", Roboto, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#5b8def';
+        grafico.ofertas.forEach(function (valor, i) {
+          var total = grafico.total[i];
+          if (!total) return;
+          var elem = meta.data[i];
+          if (!elem) return;
+          ctx.fillText((valor / total * 100).toFixed(1) + '%', elem.x, elem.y - 8);
+        });
+        ctx.restore();
+      },
+    };
+
+    var chart = new Chart(elemento, {
+      type: 'bar',
+      data: { labels: grafico.labels.map(maiuscula), datasets: datasets },
+      options: {
+        responsive: true,
+        layout: { padding: { top: 22 } },
+        plugins: {
+          legend: { display: true, position: 'bottom' },
+          tooltip: { callbacks: { label: callbackTooltip(seriesInfo) } },
+        },
+        scales: {
+          y: { beginAtZero: true, ticks: { callback: function (v) { return formatarEixo('moeda', v); } } },
+        },
+      },
+      plugins: [rotuloPct],
+    });
+    chart._seriesInfo = seriesInfo;
+    return chart;
+  };
 })();

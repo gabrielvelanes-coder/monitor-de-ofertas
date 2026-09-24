@@ -162,3 +162,41 @@ def consultar_venda_por_produtos_e_lojas(inicio: date, fim: date, produtos, codi
         inicio, fim, 'e.descricao = ANY(%(produtos)s) AND u.codigo = ANY(%(codigos)s)',
         produtos=list(produtos), codigos=[str(c).zfill(2) for c in codigos_loja],
     )
+
+
+CONSULTA_VENDA_GERAL_MENSAL = """
+SELECT date_trunc('month', iv.datahora)::date AS mes,
+       u.codigo                                   AS cod_un_neg,
+       SUM(iv.quantidade)                         AS itens,
+       SUM(iv.valortotal)                         AS venda,
+       SUM(iv.quantidade * COALESCE(me.custo, 0)) AS custo
+FROM itemvenda iv
+JOIN venda v          ON v.id = iv.vendaid AND v.status = 'F'
+JOIN unidadenegocio u ON u.id = iv.unidadenegocioid
+LEFT JOIN movimentacaoestoque me ON me.id = iv.movimentacaoestoqueid
+WHERE iv.status = 'F'
+  AND iv.datahora >= %(inicio)s
+  AND iv.datahora <  %(fim)s
+GROUP BY 1, 2
+ORDER BY 1, 2
+"""
+
+
+def consultar_venda_geral_mensal(inicio: date, fim: date) -> pd.DataFrame:
+    """Faturamento do MÊS INTEIRO por loja -- TODO produto, com ou sem
+    oferta, de `inicio` (inclusive) a `fim` (exclusive). Pra "vendas
+    gerais" do dashboard (23/09/26) -- diferente das outras consultas
+    deste módulo, não filtra por fabricante/tag/produto nenhum, e já
+    agrega por mês (não por dia/produto): o catálogo inteiro por item
+    seria centenas de milhares de linhas/mês, sem necessidade nenhuma
+    pra essa pergunta ("que fatia do faturamento total são as ofertas?").
+    Medido: ~7s pra 9 meses × todas as lojas -- por isso `importar_do_
+    banco vendas_gerais` grava o resultado (`VendaGeralMensal`) em vez do
+    dashboard consultar o banco a cada carregamento de página."""
+    with conectar() as conn, conn.cursor() as cur:
+        cur.execute(CONSULTA_VENDA_GERAL_MENSAL, {'inicio': inicio, 'fim': fim})
+        colunas = [d.name for d in cur.description]
+        df = pd.DataFrame(cur.fetchall(), columns=colunas)
+    for col in ('itens', 'venda', 'custo'):
+        df[col] = pd.to_numeric(df[col]).astype(float)
+    return df

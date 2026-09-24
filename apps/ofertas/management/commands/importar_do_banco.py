@@ -38,17 +38,18 @@ from datetime import date, datetime, timedelta
 
 import pandas as pd
 from django.core.management.base import BaseCommand, CommandError
+from django.db import transaction
 from django.db.models import Max, Sum
 
 from apps.lojas.models import Loja
 from apps.ofertas.erp import codigo_loja, fabricante_generico, tag_sem_prefixo
 from apps.ofertas.erp_banco import (
     consultar_venda_por_item, consultar_venda_por_produtos,
-    consultar_venda_por_produtos_e_lojas, consultar_venda_por_tag,
+    consultar_venda_por_produtos_e_lojas, consultar_venda_por_tag, consultar_venda_geral_mensal,
 )
 from apps.ofertas.importadores import importar_relatorio_fabricante
 from apps.ofertas.management.commands.importar_botica import TAGS_BOTICA
-from apps.ofertas.models import Lancamento
+from apps.ofertas.models import Lancamento, VendaGeralMensal
 from apps.produtos.services import mapa_fabricantes
 from apps.verba.services import sincronizar_verba_leve3
 
@@ -259,7 +260,7 @@ class Command(BaseCommand):
     help = 'Importa uma mecânica direto do banco do ERP (somente leitura).'
 
     def add_arguments(self, parser):
-        parser.add_argument('mecanica', choices=[*MECANICAS, 'todas'])
+        parser.add_argument('mecanica', choices=[*MECANICAS, 'vendas_gerais', 'todas'])
         parser.add_argument('--comparar', action='store_true',
                             help='Só compara banco x dados atuais do painel, mês a mês. Não grava nada.')
         parser.add_argument('--dias', type=int, default=None,
@@ -269,9 +270,54 @@ class Command(BaseCommand):
                             help='AAAA-MM-DD, exclusivo (padrão: hoje, ou seja, até ontem).')
 
     def handle(self, *args, **opts):
-        nomes = list(MECANICAS) if opts['mecanica'] == 'todas' else [opts['mecanica']]
-        for nome in nomes:
-            self._processar(nome, opts)
+        if opts['mecanica'] == 'todas':
+            for nome in MECANICAS:
+                self._processar(nome, opts)
+            self._processar_vendas_gerais(opts)
+        elif opts['mecanica'] == 'vendas_gerais':
+            self._processar_vendas_gerais(opts)
+        else:
+            self._processar(opts['mecanica'], opts)
+
+    def _processar_vendas_gerais(self, opts):
+        """Faturamento do MÊS INTEIRO por loja, TODO produto -- não é uma
+        'mecânica' (não usa `Lancamento`/oferta-base, é só o denominador
+        pra medir "que fatia é oferta?", `VendaGeralMensal`). Sem
+        `--comparar` (não tem planilha antiga pra comparar, é dado novo)."""
+        hoje = date.today()
+        if opts['dias']:
+            inicio = hoje - timedelta(days=opts['dias'])
+        else:
+            inicio = opts['inicio'] or INICIO_PADRAO
+        fim = opts['fim'] or hoje
+
+        self.stdout.write(f'vendas_gerais: consultando o banco de {inicio:%d/%m/%Y} até {fim - timedelta(days=1):%d/%m/%Y}...')
+        df = consultar_venda_geral_mensal(inicio, fim)
+        lojas = {loja.codigo: loja for loja in Loja.objects.all()}
+        lojas_sem_cadastro = set()
+        gravados = 0
+        meses_do_periodo = set()
+        with transaction.atomic():
+            for linha in df.itertuples(index=False):
+                codigo = codigo_loja(linha.cod_un_neg)
+                loja = lojas.get(codigo)
+                if loja is None:
+                    lojas_sem_cadastro.add(codigo)
+                    continue
+                ano_mes = f'{linha.mes:%Y-%m}'
+                meses_do_periodo.add(ano_mes)
+                VendaGeralMensal.objects.update_or_create(
+                    ano_mes=ano_mes, loja=loja,
+                    defaults={'itens': linha.itens, 'venda': linha.venda, 'custo': linha.custo},
+                )
+                gravados += 1
+        self.stdout.write(self.style.SUCCESS(
+            f'vendas_gerais: {gravados} linhas (loja×mês) gravadas em {len(meses_do_periodo)} mês(es).'
+        ))
+        if lojas_sem_cadastro:
+            self.stdout.write(self.style.WARNING(
+                f"Lojas sem cadastro (ignoradas): {', '.join(sorted(lojas_sem_cadastro))}."
+            ))
 
     def _processar(self, nome, opts):
         cfg = MECANICAS[nome]

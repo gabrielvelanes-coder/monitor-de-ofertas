@@ -96,3 +96,30 @@ class Lancamento(models.Model):
 
     def __str__(self):
         return f'[{self.mecanica}] {self.loja_id} · {self.produto_descricao} · {self.ano_mes}'
+
+
+class VendaGeralMensal(models.Model):
+    """Faturamento do MÊS INTEIRO por loja -- todo produto, com ou sem
+    oferta, não só as 9 ações monitoradas (`Lancamento`). Existe só pra
+    responder "que fatia do faturamento total são as ofertas?" (dashboard,
+    pedido 23/09/26) -- por isso fica agregado (1 linha por loja/mês), nunca
+    por produto: o catálogo inteiro por item seria centenas de milhares de
+    linhas/mês, sem necessidade nenhuma pra essa pergunta."""
+
+    ano_mes = models.CharField('ano-mês', max_length=7, help_text='formato AAAA-MM')
+    loja = models.ForeignKey(Loja, on_delete=models.PROTECT, related_name='vendas_gerais_mensais')
+    itens = models.DecimalField('itens', max_digits=12, decimal_places=2)
+    venda = models.DecimalField('venda', max_digits=14, decimal_places=2)
+    custo = models.DecimalField('custo', max_digits=14, decimal_places=2)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'venda geral mensal'
+        verbose_name_plural = 'vendas gerais mensais'
+        constraints = [
+            models.UniqueConstraint(fields=['ano_mes', 'loja'], name='venda_geral_unica_por_mes_loja'),
+        ]
+        indexes = [models.Index(fields=['ano_mes'])]
+
+    def __str__(self):
+        return f'{self.ano_mes} · {self.loja_id}'

@@ -1,8 +1,10 @@
 import io
+from collections import defaultdict
 from decimal import Decimal
 
 from django.contrib import messages
 from django.core.management import call_command
+from django.db.models import Sum
 from django.http import Http404, HttpResponse
 from django.shortcuts import redirect, render
 
@@ -23,8 +25,9 @@ from .services import (
     calcular_impacto_fabricante, calcular_impacto_leve3_fabricante,
     calcular_kimberly, calcular_leve3, calcular_marketing,
     calcular_supracorp, filtrar_por_bandeira, grafico_mensal,
-    mes_da_request, meses_disponiveis, querystring_extra, serie_diaria,
-    serie_semanal,
+    mes_atual_ou_ultimo_disponivel, mes_da_request, meses_disponiveis,
+    querystring_extra, serie_diaria, serie_semanal,
+    vendas_gerais_evolucao_mensal, vendas_gerais_resumo,
 )
 
 ZERO = Decimal('0')
@@ -68,14 +71,21 @@ def _dados_periodo(queryset_sem_mes):
     }
 
 
-def _resumo_executivo(bandeira, mes=''):
+def _resumo_executivo(bandeira, mes='', mes_de='', mes_ate=''):
     """1 linha por ação, com a fatia de venda/lucro/itens que representa a
     oferta (não o catálogo de referência inteiro) — pra home funcionar como
-    dashboard executivo. `mes` (AAAA-MM) filtra pra 1 mês só; vazio = todos."""
+    dashboard executivo. `mes` (AAAA-MM) filtra pra 1 mês só; vazio = todos.
+    `mes_de`/`mes_ate` (23/09/26, pedido "escolher mais datas"): intervalo
+    de meses -- só usado quando `mes` não vem preenchido."""
     def qs(mecanica):
         queryset = filtrar_por_bandeira(Lancamento.objects.filter(mecanica=mecanica), bandeira)
         if mes:
             queryset = queryset.filter(ano_mes=mes)
+        elif mes_de or mes_ate:
+            if mes_de:
+                queryset = queryset.filter(ano_mes__gte=mes_de)
+            if mes_ate:
+                queryset = queryset.filter(ano_mes__lte=mes_ate)
         return queryset
 
     acoes = []
@@ -129,41 +139,101 @@ def _resumo_executivo(bandeira, mes=''):
 
     for a in acoes:
         a['cmv_pct_sem_verba'] = cmv_pct(a['venda'], a['lucro'])
-        a['verba_apurada'] = verba_apurada(a['chave'], mes)
+        a['verba_apurada'] = verba_apurada(a['chave'], mes, mes_de, mes_ate)
         a['cmv_pct_com_verba'] = cmv_pct_com_verba(a['venda'], a['lucro'], a['verba_apurada'])
 
     acoes.sort(key=lambda a: a['venda'], reverse=True)
+    total_venda = sum((a['venda'] for a in acoes), ZERO)
+    total_lucro = sum((a['lucro'] for a in acoes), ZERO)
+    # Verba total só soma ações COM fórmula definida (verba_apurada is not
+    # None) -- ficaria artificialmente baixo se contasse as sem fórmula
+    # como R$0 (pareceria "sem verba a receber" em vez de "pendente").
+    total_verba = sum((a['verba_apurada'] for a in acoes if a['verba_apurada'] is not None), ZERO)
     return {
         'acoes': acoes,
-        'total_venda': sum((a['venda'] for a in acoes), ZERO),
-        'total_lucro': sum((a['lucro'] for a in acoes), ZERO),
+        'total_venda': total_venda,
+        'total_lucro': total_lucro,
         'total_itens': sum((a['itens'] for a in acoes), ZERO),
+        'total_verba': total_verba,
+        'cmv_pct_sem_verba': cmv_pct(total_venda, total_lucro),
+        'cmv_pct_com_verba': cmv_pct_com_verba(total_venda, total_lucro, total_verba or None),
     }
 
 
 def home(request):
     bandeira = bandeira_da_request(request)
     meses = meses_disponiveis()
-    mes = mes_da_request(request)
+
+    # Período: "mês" único, "de/até" (intervalo) ou nada -- nada só cai no
+    # padrão "mês vigente" na 1ª visita (sem NENHUM parâmetro na URL);
+    # `?mes=` explícito (inclusive vazio, "Todos os meses" no seletor)
+    # sempre vence, pra continuar dando pra ver o histórico inteiro
+    # (pedido 23/09/26: "trazer selecionado apenas o mês vigente e com
+    # opção de escolher mais datas" -- o intervalo é essa opção).
+    mes_de = request.GET.get('de', '').strip()
+    mes_ate = request.GET.get('ate', '').strip()
+    mes_de = mes_de if mes_de in meses else ''
+    mes_ate = mes_ate if mes_ate in meses else ''
+    if mes_de or mes_ate:
+        mes = ''
+    elif 'mes' in request.GET or 'de' in request.GET or 'ate' in request.GET:
+        mes = mes_da_request(request)
+    else:
+        mes = mes_atual_ou_ultimo_disponivel()
 
     lojas_velanes = Loja.objects.filter(bandeira=Loja.VELANES).count()
     lojas_ultra = Loja.objects.filter(bandeira=Loja.ULTRA_POPULAR).count()
 
-    resumo = _resumo_executivo(bandeira, mes)
+    resumo = _resumo_executivo(bandeira, mes, mes_de, mes_ate)
     grafico = {
         'labels': [a['rotulo'] for a in resumo['acoes']],
         'series': [{'label': 'Venda', 'data': [float(a['venda']) for a in resumo['acoes']]}],
     }
 
+    # Vendas gerais (23/09/26, pedido "ter essa visão" de 23/09 anterior):
+    # faturamento do mês/período INTEIRO (todo produto), não só as 9 ações
+    # -- denominador pra "que fatia do faturamento é oferta?".
+    vendas_gerais = vendas_gerais_resumo(bandeira, mes, mes_de, mes_ate)
+    pct_ofertas_do_total = (
+        (resumo['total_venda'] / vendas_gerais['venda'] * 100) if vendas_gerais['venda'] else None
+    )
+
+    # Gráfico "evolução" usa o HISTÓRICO COMPLETO (não o período filtrado
+    # acima) -- mesmo padrão já usado nas telas de ação: cards mostram só
+    # o recorte, gráfico sempre compara com o passado. "Venda em oferta"
+    # por mês aqui é uma simplificação (soma direta `grupo=oferta` de
+    # todas as ações, sem chamar cada calcular_* individualmente como o
+    # resumo acima faz) -- serve pra tendência, não precisa ser centavo a
+    # centavo igual aos KPIs; Supra Corp Day (não usa `grupo`) fica de
+    # fora dessa soma, sem problema, é uma fração pequena do total.
+    vendas_gerais_por_mes = vendas_gerais_evolucao_mensal(bandeira)
+    ofertas_por_mes = defaultdict(lambda: ZERO)
+    qs_ofertas = filtrar_por_bandeira(
+        Lancamento.objects.exclude(mecanica=Lancamento.SELLOUT).filter(grupo=Lancamento.GRUPO_OFERTA), bandeira,
+    )
+    for r in qs_ofertas.values('ano_mes').annotate(venda=Sum('venda')):
+        ofertas_por_mes[r['ano_mes']] = r['venda'] or ZERO
+    labels_evolucao = sorted(set(vendas_gerais_por_mes) | set(ofertas_por_mes))
+    grafico_geral = {
+        'labels': labels_evolucao,
+        'total': [float(vendas_gerais_por_mes.get(m, ZERO)) for m in labels_evolucao],
+        'ofertas': [float(ofertas_por_mes.get(m, ZERO)) for m in labels_evolucao],
+    }
+
     contexto = {
         'secao': 'home',
         'bandeira_atual': bandeira,
-        'querystring_extra': querystring_extra(request),
+        'querystring_extra': querystring_extra(request, excluir=('bandeira', 'mes', 'de', 'ate')),
         'meses_disponiveis': meses,
         'mes_atual': mes,
+        'mes_de_atual': mes_de,
+        'mes_ate_atual': mes_ate,
         'lojas_velanes': lojas_velanes,
         'lojas_ultra': lojas_ultra,
         'grafico': grafico,
+        'vendas_gerais': vendas_gerais,
+        'pct_ofertas_do_total': pct_ofertas_do_total,
+        'grafico_geral': grafico_geral,
         **resumo,
     }
     return render(request, 'ofertas/home.html', contexto)
@@ -257,6 +327,8 @@ def leve3(request):
         # histórico completo -- drill-down (clicar num produto) mostra a
         # evolução inteira dele, não só o(s) ponto(s) do mês filtrado.
         'series_produtos': dados_grafico['series_produtos'],
+        'series_lojas': dados_grafico['series_lojas'],
+        'series_bandeiras': dados_grafico['series_bandeiras'],
     }
     return render(request, 'ofertas/leve3.html', contexto)
 
@@ -294,6 +366,8 @@ def cestoes(request):
         'grafico': grafico,
         **dados,
         'series_produtos': dados_grafico['series_produtos'],
+        'series_lojas': dados_grafico['series_lojas'],
+        'series_bandeiras': dados_grafico['series_bandeiras'],
     }
     return render(request, 'ofertas/cestoes.html', contexto)
 
@@ -426,6 +500,8 @@ def impacto_fabricante(request, fabricante):
         **dados,
         'series_produtos': dados_grafico['series_produtos'],
         'series_campanhas': dados_grafico['series_campanhas'],
+        'series_lojas': dados_grafico['series_lojas'],
+        'series_bandeiras': dados_grafico['series_bandeiras'],
     }
     return render(request, 'ofertas/impacto_fabricante.html', contexto)
 
@@ -483,6 +559,7 @@ def impacto_promocao(request, promocao):
         **dados_periodo,
         **dados,
         'series_produtos': dados_grafico['series_produtos'],
+        'series_lojas': dados_grafico['series_lojas'],
     }
     return render(request, 'ofertas/impacto_promocao.html', contexto)
 

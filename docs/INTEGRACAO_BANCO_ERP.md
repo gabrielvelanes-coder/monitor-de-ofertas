@@ -291,3 +291,19 @@ não tinha nenhum cobrindo consulta por fabricante.
    (`_abas_periodo.html`) que as outras já têm — dá pra ligar se o Gabriel
    quiser, é trabalho de UI, não de dado (Leve3 já tinha as abas desde
    22/09, usando o arquivo bruto por dia que ele mandou à parte).
+8. ~~Dashboard "vendas gerais + ofertas"~~ — resolvido (23/09/26): a
+   pendência de 21-23/09 (faturamento total do Grupo Velanes, não só as 9
+   ações) ficou viável com o acesso direto ao banco. `VendaGeralMensal`
+   (novo model, `ano_mes` × `loja`, agregado — NÃO por produto, seria
+   centenas de milhares de linhas/mês sem necessidade) alimentado por
+   `manage.py importar_do_banco vendas_gerais` (também roda dentro de
+   `todas`, então a Tarefa Agendada/botão "Atualizar agora" já mantêm em
+   dia). `consultar_venda_geral_mensal` (`erp_banco.py`) faz o agregado
+   direto no Postgres (`GROUP BY` mês+loja, ~7-8s pro histórico inteiro —
+   por isso fica gravado local, não é consulta ao vivo a cada
+   carregamento do dashboard). Dashboard novo mostra faturamento total ×
+   faturamento em oferta (badge de %), CMV sem/com verba agregado, e um
+   gráfico "evolução mensal" (sempre histórico completo, cards seguem o
+   filtro — mesmo padrão das telas de ação). Filtro do dashboard ganhou
+   "De/Até" (intervalo de meses, além do mês único) e passou a default
+   pro MÊS VIGENTE em vez de "todos os meses" (pedido do Gabriel).

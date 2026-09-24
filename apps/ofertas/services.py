@@ -22,7 +22,7 @@ from django.db.models import Sum
 from apps.lojas.models import Loja
 
 from .erp import ano_mes_de, tag_sem_prefixo
-from .models import Lancamento
+from .models import Lancamento, VendaGeralMensal
 
 ZERO = Decimal('0')
 ROTULOS_BANDEIRA = {'velanes': 'Velanes', 'ultra_popular': 'Ultra Popular'}
@@ -58,6 +58,49 @@ def meses_disponiveis(mecanica: str = '') -> list:
     if mecanica:
         queryset = queryset.filter(mecanica=mecanica)
     return sorted(v for v in queryset.values_list('ano_mes', flat=True).distinct() if v)
+
+
+def mes_atual_ou_ultimo_disponivel() -> str:
+    """Mês corrente (AAAA-MM) se já tiver dado importado; senão o mês mais
+    recente disponível -- dashboard (23/09/26, pedido "trazer selecionado
+    apenas o mês vigente") não pode cair num mês sem nenhum dado."""
+    meses = meses_disponiveis()
+    if not meses:
+        return ''
+    atual = ano_mes_de(date.today())
+    return atual if atual in meses else meses[-1]
+
+
+def vendas_gerais_resumo(bandeira: str, mes: str = '', mes_de: str = '', mes_ate: str = '') -> dict:
+    """Faturamento do MÊS INTEIRO (todo produto) no período pedido --
+    denominador de "que fatia é oferta?" (dashboard, pedido 23/09/26).
+    Mesma regra de período de `_resumo_executivo` (views.py): `mes` pra 1
+    mês só, `mes_de`/`mes_ate` pra intervalo, nenhum dos 3 = tudo."""
+    queryset = filtrar_por_bandeira(VendaGeralMensal.objects.all(), bandeira)
+    if mes:
+        queryset = queryset.filter(ano_mes=mes)
+    elif mes_de or mes_ate:
+        if mes_de:
+            queryset = queryset.filter(ano_mes__gte=mes_de)
+        if mes_ate:
+            queryset = queryset.filter(ano_mes__lte=mes_ate)
+    agregado = queryset.aggregate(venda=Sum('venda'), itens=Sum('itens'), custo=Sum('custo'))
+    return {
+        'venda': agregado['venda'] or ZERO,
+        'itens': agregado['itens'] or ZERO,
+        'custo': agregado['custo'] or ZERO,
+    }
+
+
+def vendas_gerais_evolucao_mensal(bandeira: str) -> dict:
+    """Venda geral por mês, histórico COMPLETO (sem filtro de período) --
+    pro gráfico "evolução" do dashboard sempre comparar com o passado,
+    mesmo padrão já usado nas telas de ação (cards filtram, gráfico não)."""
+    queryset = filtrar_por_bandeira(VendaGeralMensal.objects.all(), bandeira)
+    por_mes = defaultdict(lambda: ZERO)
+    for r in queryset.values('ano_mes').annotate(venda=Sum('venda')):
+        por_mes[r['ano_mes']] = r['venda'] or ZERO
+    return dict(por_mes)
 
 
 def mes_da_request(request, mecanica: str = '') -> str:
@@ -150,6 +193,13 @@ def calcular_leve3(queryset, busca: str = ''):
     })
     por_produto = defaultdict(lambda: {'itens': ZERO, 'ciclos': ZERO, 'investimento': ZERO, 'venda': ZERO, 'custo': ZERO, 'lucro': ZERO})
     por_produto_mes = defaultdict(lambda: defaultdict(lambda: ZERO))
+    # Drill-down de Lojas (23/09/26, pedido "tornar a tabela de Lojas
+    # interativa também") -- mesmo padrão de `por_produto_mes`, só que
+    # chaveado pelo código da loja (loja-a-loja) e pelo rótulo da bandeira
+    # (por bandeira), pra clicar numa linha destacar a série dela no
+    # gráfico, igual já funciona em Produtos.
+    por_loja_mes = defaultdict(lambda: defaultdict(lambda: ZERO))
+    por_bandeira_mes = defaultdict(lambda: defaultdict(lambda: ZERO))
 
     for linha in linhas:
         itens = linha['itens'] or ZERO
@@ -185,6 +235,8 @@ def calcular_leve3(queryset, busca: str = ''):
         loja['margem_contabil'] += lucro
         loja['margem_ajustada'] += margem_ajustada
         loja['investimento'] += investimento
+        por_loja_mes[linha['loja__codigo']][linha['ano_mes']] += venda
+        por_bandeira_mes[ROTULOS_BANDEIRA.get(linha['loja__bandeira'], linha['loja__bandeira'])][linha['ano_mes']] += venda
 
         produto = por_produto[linha['produto_descricao']]
         produto['itens'] += itens
@@ -229,6 +281,8 @@ def calcular_leve3(queryset, busca: str = ''):
         ),
         'produtos': produtos,
         'series_produtos': alinhar_com_labels(por_produto_mes, labels),
+        'series_lojas': alinhar_com_labels(por_loja_mes, labels),
+        'series_bandeiras': alinhar_com_labels(por_bandeira_mes, labels),
     }
 
 
@@ -250,6 +304,8 @@ def calcular_cestoes(queryset, busca: str = ''):
     por_loja = defaultdict(lambda: {'codigo': '', 'bandeira': '', 'itens': ZERO, 'venda': ZERO, 'lucro': ZERO})
     por_produto = defaultdict(lambda: {'itens': ZERO, 'venda': ZERO, 'custo': ZERO, 'lucro': ZERO})
     por_produto_mes = defaultdict(lambda: defaultdict(lambda: ZERO))
+    por_loja_mes = defaultdict(lambda: defaultdict(lambda: ZERO))
+    por_bandeira_mes = defaultdict(lambda: defaultdict(lambda: ZERO))
 
     for linha in linhas:
         itens = linha['itens'] or ZERO
@@ -273,6 +329,8 @@ def calcular_cestoes(queryset, busca: str = ''):
         loja['itens'] += itens
         loja['venda'] += venda
         loja['lucro'] += lucro
+        por_loja_mes[linha['loja__codigo']][linha['ano_mes']] += venda
+        por_bandeira_mes[ROTULOS_BANDEIRA.get(linha['loja__bandeira'], linha['loja__bandeira'])][linha['ano_mes']] += venda
 
         produto = por_produto[linha['produto_descricao']]
         produto['itens'] += itens
@@ -304,6 +362,8 @@ def calcular_cestoes(queryset, busca: str = ''):
         'ranking_bandeiras': agrupar_por_bandeira(por_loja.values(), ['itens', 'venda', 'lucro']),
         'produtos': produtos,
         'series_produtos': alinhar_com_labels(por_produto_mes, labels),
+        'series_lojas': alinhar_com_labels(por_loja_mes, labels),
+        'series_bandeiras': alinhar_com_labels(por_bandeira_mes, labels),
     }
 
 
@@ -651,6 +711,11 @@ def calcular_impacto_fabricante(queryset, busca: str = '', queryset_baseline=Non
     # (não existia antes -- `por_produto` só tinha o lado oferta).
     por_produto_base_mes = defaultdict(lambda: defaultdict(lambda: ZERO))
     dias_oferta_por_mes = defaultdict(set)
+    # Drill-down de Lojas (23/09/26) -- mesmo padrão de `por_produto_mes`,
+    # só venda OFERTA (só ela é rastreada por loja aqui, igual o resto da
+    # função -- base fica só a nível de produto, `por_produto_base_mes`).
+    por_loja_mes = defaultdict(lambda: defaultdict(lambda: ZERO))
+    por_bandeira_mes = defaultdict(lambda: defaultdict(lambda: ZERO))
 
     totais = {g: {'itens': ZERO, 'venda': ZERO, 'custo': ZERO, 'lucro': ZERO}
               for g in (Lancamento.GRUPO_BASE, Lancamento.GRUPO_OFERTA)}
@@ -688,6 +753,8 @@ def calcular_impacto_fabricante(queryset, busca: str = '', queryset_baseline=Non
             loja['itens_oferta'] += itens
             loja['venda_oferta'] += venda
             loja['lucro_oferta'] += lucro
+            por_loja_mes[linha['loja__codigo']][linha['ano_mes']] += venda
+            por_bandeira_mes[ROTULOS_BANDEIRA.get(linha['loja__bandeira'], linha['loja__bandeira'])][linha['ano_mes']] += venda
 
             produto = por_produto[linha['produto_descricao']]
             produto['itens_oferta'] += itens
@@ -812,6 +879,8 @@ def calcular_impacto_fabricante(queryset, busca: str = '', queryset_baseline=Non
         ),
         'produtos': produtos,
         'series_produtos': alinhar_com_labels(por_produto_mes, labels),
+        'series_lojas': alinhar_com_labels(por_loja_mes, labels),
+        'series_bandeiras': alinhar_com_labels(por_bandeira_mes, labels),
         'campanhas': sorted(
             [
                 {

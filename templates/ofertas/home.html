@@ -2,54 +2,89 @@
 {% load ofertas_tags %}
 {% block title %}Dashboard{% endblock %}
 {% block conteudo %}
+<style>
+  .card.destaque { border-color: #35507a; background: linear-gradient(160deg, var(--accent-bg), var(--card) 70%); }
+  .badge-pct {
+    display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; font-weight: 700;
+    background: var(--accent); color: #0e1116; padding: 2px 9px; border-radius: 20px; margin-top: 8px;
+  }
+  .card .sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .secao-dashboard { margin-top: 36px; }
+  .secao-dashboard h2 { font-size: 16px; margin: 0 0 4px; }
+  .secao-dashboard .nota { font-size: 13px; color: var(--muted); margin: 0 0 14px; max-width: 68ch; }
+</style>
 
 <h2 style="margin-top:0;">Resumo executivo</h2>
 
-<div class="cards">
-  <div class="card"><div class="rotulo">Venda em oferta (todas as ações)</div><div class="valor">{{ total_venda|brl }}</div></div>
-  <div class="card"><div class="rotulo">Lucro (todas as ações)</div><div class="valor">{{ total_lucro|brl }}</div></div>
-  <div class="card"><div class="rotulo">Itens vendidos</div><div class="valor">{{ total_itens|numero }}</div></div>
-  <div class="card"><div class="rotulo">Lojas Velanes / Ultra Popular</div><div class="valor">{{ lojas_velanes }} / {{ lojas_ultra }}</div></div>
-</div>
-
-{% if not total_venda %}
+{% if not total_venda and not vendas_gerais.venda %}
   <div class="aviso">
-    Nenhum dado importado ainda. Copie os relatórios pra <code>dados/entrada/</code>
-    e rode os comandos <code>python manage.py importar_*</code> — ver README.
+    Nenhum dado importado ainda. Use o botão "Atualizar agora" no menu, ou
+    <code>python manage.py importar_do_banco todas</code> — ver README.
   </div>
 {% endif %}
 
-<div class="grafico-card">
-  <h3 style="margin-top:0;">Venda por ação</h3>
-  <canvas id="grafico-home"></canvas>
-</div>
-{{ grafico|json_script:"dados-grafico-home" }}
+<div class="secao-dashboard" style="margin-top:0;">
+  <h2>Vendas gerais × ofertas</h2>
+  <p class="nota">Faturamento do Grupo Velanes inteiro (todo produto, todas as lojas) comparado com o que vem das 9 ações monitoradas — pra enxergar o peso real das ofertas no negócio.</p>
+  <div class="cards">
+    <div class="card">
+      <div class="rotulo">Faturamento total do grupo</div>
+      <div class="valor">{{ vendas_gerais.venda|brl }}</div>
+      <div class="sub">{{ vendas_gerais.itens|numero }} itens vendidos</div>
+    </div>
+    <div class="card destaque">
+      <div class="rotulo">Faturamento em ofertas monitoradas</div>
+      <div class="valor">{{ total_venda|brl }}</div>
+      {% if pct_ofertas_do_total is not None %}
+        <span class="badge-pct">{{ pct_ofertas_do_total|numero:1 }}% do faturamento total</span>
+      {% endif %}
+    </div>
+    <div class="card">
+      <div class="rotulo">Lucro em ofertas</div>
+      <div class="valor">{{ total_lucro|brl }}</div>
+      <div class="sub">CMV {{ cmv_pct_sem_verba|numero:1 }}% sem verba{% if cmv_pct_com_verba is not None %} · {{ cmv_pct_com_verba|numero:1 }}% com verba{% endif %}</div>
+    </div>
+    <div class="card">
+      <div class="rotulo">Lojas Velanes / Ultra Popular</div>
+      <div class="valor">{{ lojas_velanes }} / {{ lojas_ultra }}</div>
+    </div>
+  </div>
 
-<h3>Ranking de ações</h3>
-<table id="tabela-acoes" class="tabela-interativa">
-  <thead>
-    <tr><th>Ação</th><th>Itens</th><th>Venda</th><th>CMV %</th><th>Lucro</th><th>CMV % com verba</th></tr>
-  </thead>
-  <tbody>
-    {% for a in acoes %}
-      <tr>
-        <td>{% if a.url_arg %}<a href="{% url a.url a.url_arg %}">{{ a.rotulo }}</a>{% else %}<a href="{% url a.url %}">{{ a.rotulo }}</a>{% endif %}</td>
-        <td>{{ a.itens|numero }}</td>
-        <td>{{ a.venda|brl }}</td>
-        <td>{{ a.cmv_pct_sem_verba|numero:1 }}%</td>
-        <td>{{ a.lucro|brl }}</td>
-        <td>{% if a.cmv_pct_com_verba is not None %}{{ a.cmv_pct_com_verba|numero:1 }}%{% else %}<span class="vazio" title="Sem fórmula de verba definida ainda">—</span>{% endif %}</td>
-      </tr>
-    {% empty %}
-      <tr><td colspan="6" class="vazio">Sem dados.</td></tr>
-    {% endfor %}
-  </tbody>
-</table>
+  <div class="grafico-card">
+    <h3 style="margin-top:0;">Evolução mensal — total do grupo vs. ofertas</h3>
+    <canvas id="grafico-vendas-gerais"></canvas>
+  </div>
+  {{ grafico_geral|json_script:"dados-grafico-geral" }}
+</div>
+
+<div class="secao-dashboard">
+  <h2>Ranking de ações</h2>
+  <p class="nota">Mesmo recorte de período do topo da página (mês/intervalo escolhido).</p>
+  <table id="tabela-acoes" class="tabela-interativa">
+    <thead>
+      <tr><th>Ação</th><th>Itens</th><th>Venda</th><th>CMV %</th><th>Lucro</th><th>CMV % com verba</th></tr>
+    </thead>
+    <tbody>
+      {% for a in acoes %}
+        <tr>
+          <td>{% if a.url_arg %}<a href="{% url a.url a.url_arg %}">{{ a.rotulo }}</a>{% else %}<a href="{% url a.url %}">{{ a.rotulo }}</a>{% endif %}</td>
+          <td>{{ a.itens|numero }}</td>
+          <td>{{ a.venda|brl }}</td>
+          <td>{{ a.cmv_pct_sem_verba|numero:1 }}%</td>
+          <td>{{ a.lucro|brl }}</td>
+          <td>{% if a.cmv_pct_com_verba is not None %}{{ a.cmv_pct_com_verba|numero:1 }}%{% else %}<span class="vazio" title="Sem fórmula de verba definida ainda">—</span>{% endif %}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="6" class="vazio">Sem dados.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
 
 {% endblock %}
 {% block extra_js %}
 <script>
-  var dados = JSON.parse(document.getElementById('dados-grafico-home').textContent);
-  graficoBarra('grafico-home', dados.labels, dados.series);
+  var dados = JSON.parse(document.getElementById('dados-grafico-geral').textContent);
+  graficoVendasGerais('grafico-vendas-gerais', dados);
 </script>
 {% endblock %}

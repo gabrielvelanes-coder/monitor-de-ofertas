@@ -62,11 +62,25 @@
       background: var(--card); border-bottom: 1px solid var(--border);
       padding: 12px 24px; display: flex; justify-content: flex-end;
     }
-    .filtro-bandeira { display: flex; gap: 6px; align-items: center; }
-    .filtro-bandeira select {
-      padding: 5px 8px; border-radius: 6px; border: 1px solid var(--border);
-      font-size: 13.5px; text-transform: uppercase;
+    .filtro-bandeira {
+      display: flex; gap: 4px; align-items: stretch;
+      background: var(--th-bg); border: 1px solid var(--border); border-radius: 10px; padding: 4px;
     }
+    .filtro-item {
+      display: flex; flex-direction: column; justify-content: center; gap: 1px;
+      padding: 4px 14px; border-radius: 7px; cursor: pointer; min-width: 84px;
+    }
+    .filtro-item:has(select:focus-visible) { outline: 2px solid var(--accent); outline-offset: -2px; }
+    .filtro-item.tem-valor { background: var(--accent-bg); }
+    .filtro-item .rotulo-filtro {
+      font-size: 9.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .03em;
+    }
+    .filtro-item select {
+      border: none; background: none; padding: 0; margin: 0; font-size: 13px; font-weight: 600;
+      color: var(--text); cursor: pointer;
+    }
+    .filtro-item.tem-valor select { color: var(--accent); }
+    .filtro-separador { width: 1px; background: var(--border); margin: 4px 2px; }
     input, select, button, option {
       text-transform: uppercase; background: var(--card); color: var(--text);
       border-color: var(--border); color-scheme: dark;
@@ -156,7 +170,6 @@
         <a href="{% url 'ofertas:impacto_promocao' 'ultra_queimao' %}" class="{% if secao == 'promocao_ultra_queimao' %}ativo{% endif %}">Ultra Queimão</a>
 
         <div class="grupo-titulo">Sistema</div>
-        <a href="/admin/">Admin</a>
         <form method="post" action="{% url 'ofertas:atualizar_agora' %}" class="form-atualizar">
           {% csrf_token %}
           <button type="submit">Atualizar agora</button>
@@ -169,21 +182,47 @@
         <form class="filtro-bandeira" method="get">
           {% for chave, valor in querystring_extra.items %}<input type="hidden" name="{{ chave }}" value="{{ valor }}">{% endfor %}
           {% if meses_disponiveis %}
-            <label for="mes">Mês</label>
-            <select name="mes" id="mes" onchange="this.form.submit()">
-              <option value="" {% if not mes_atual %}selected{% endif %}>Todos os meses</option>
-              {% for m in meses_disponiveis %}
-                <option value="{{ m }}" {% if mes_atual == m %}selected{% endif %}>{{ m }}</option>
-              {% endfor %}
-            </select>
+            <div class="filtro-item {% if mes_atual %}tem-valor{% endif %}">
+              <span class="rotulo-filtro">Mês</span>
+              <select name="mes" id="mes" onchange="this.form.submit()" aria-label="Mês">
+                <option value="" {% if not mes_atual %}selected{% endif %}>Todos os meses</option>
+                {% for m in meses_disponiveis %}
+                  <option value="{{ m }}" {% if mes_atual == m %}selected{% endif %}>{{ m }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            {% if secao == 'home' %}
+              <div class="filtro-separador"></div>
+              <div class="filtro-item {% if mes_de_atual %}tem-valor{% endif %}">
+                <span class="rotulo-filtro">De</span>
+                <select name="de" id="de" onchange="this.form.submit()" aria-label="De (início do intervalo)">
+                  <option value="" {% if not mes_de_atual %}selected{% endif %}>—</option>
+                  {% for m in meses_disponiveis %}
+                    <option value="{{ m }}" {% if mes_de_atual == m %}selected{% endif %}>{{ m }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="filtro-item {% if mes_ate_atual %}tem-valor{% endif %}">
+                <span class="rotulo-filtro">Até</span>
+                <select name="ate" id="ate" onchange="this.form.submit()" aria-label="Até (fim do intervalo)">
+                  <option value="" {% if not mes_ate_atual %}selected{% endif %}>—</option>
+                  {% for m in meses_disponiveis %}
+                    <option value="{{ m }}" {% if mes_ate_atual == m %}selected{% endif %}>{{ m }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="filtro-separador"></div>
+            {% endif %}
           {% endif %}
           {% if not esconder_filtro_bandeira %}
-          <label for="bandeira">Bandeira</label>
-          <select name="bandeira" id="bandeira" onchange="this.form.submit()">
-            <option value="" {% if not bandeira_atual %}selected{% endif %}>Todas</option>
-            <option value="velanes" {% if bandeira_atual == 'velanes' %}selected{% endif %}>Velanes</option>
-            <option value="ultra_popular" {% if bandeira_atual == 'ultra_popular' %}selected{% endif %}>Ultra Popular</option>
-          </select>
+          <div class="filtro-item {% if bandeira_atual %}tem-valor{% endif %}">
+            <span class="rotulo-filtro">Bandeira</span>
+            <select name="bandeira" id="bandeira" onchange="this.form.submit()" aria-label="Bandeira">
+              <option value="" {% if not bandeira_atual %}selected{% endif %}>Todas</option>
+              <option value="velanes" {% if bandeira_atual == 'velanes' %}selected{% endif %}>Velanes</option>
+              <option value="ultra_popular" {% if bandeira_atual == 'ultra_popular' %}selected{% endif %}>Ultra Popular</option>
+            </select>
+          </div>
           {% endif %}
         </form>
       </div>

@@ -40,16 +40,17 @@
 </div>
 {{ grafico|json_script:"dados-grafico-promocao" }}
 {{ series_produtos|json_script:"dados-series-produtos-promocao" }}
+{{ series_lojas|json_script:"dados-series-lojas-promocao" }}
 
 <details class="secao" open>
   <summary>Lojas</summary>
-  <table class="tabela-interativa">
+  <table id="tabela-lojas" class="tabela-interativa">
     <thead>
       <tr><th>Loja</th><th>Itens</th><th>Venda</th><th>CMV %</th><th>Lucro</th><th>CMV % com verba</th></tr>
     </thead>
     <tbody>
       {% for l in ranking_lojas %}
-        <tr>
+        <tr class="linha-clicavel" data-loja="{{ l.codigo }}">
           <td>{{ l.codigo }}</td>
           <td>{{ l.itens_oferta|numero }}</td>
           <td>{{ l.venda_oferta|brl }}</td>
@@ -101,5 +102,9 @@
   if (dadosPeriodoEl) {
     montarAbasGraficoPeriodo('promocao', JSON.parse(dadosPeriodoEl.textContent));
   }
+
+  var seriesLojas = JSON.parse(document.getElementById('dados-series-lojas-promocao').textContent);
+  var destacarLoja = iniciarDrillDown(chart, seriesLojas, 'Venda oferta');
+  ligarSelecaoTabela(document.querySelectorAll('#tabela-lojas .linha-clicavel'), destacarLoja, 'loja');
 </script>
 {% endblock %}
